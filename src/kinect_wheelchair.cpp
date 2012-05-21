@@ -16,11 +16,14 @@ public:
 
 	void viewerOneOff(pcl::visualization::PCLVisualizer& pclViewer)	
 	{
-		pcl::PointXYZ o;
-		o.x = 0;
-		o.y = 0;
-		o.z = 1.0;
-		pclViewer.addSphere(o, 0.25, "sphere", 0);
+		pcl::ModelCoefficients plane_coeff;
+		plane_coeff.values.resize(4);
+		plane_coeff.values[0] = 0.0; // x
+		plane_coeff.values[1] = -1.0; // y
+		plane_coeff.values[2] = 0.0; // z
+		plane_coeff.values[3] = 0.0; // d
+		pclViewer.
+		pclViewer.addPlane(plane_coeff, "ground_test_plane", 0);
 	}
 
 	void viewerIteration(pcl::visualization::PCLVisualizer& pclViewer)
