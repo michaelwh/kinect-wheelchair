@@ -205,6 +205,16 @@ int
 				// first run
 				cld->getRenderWindow ()->SetSize (g_cloud->width, g_cloud->height);
 				cld->getRenderWindow ()->SetPosition (g_cloud->width, 0);
+
+				pcl::ModelCoefficients modelCoeff;
+				modelCoeff.values.resize(4);
+				modelCoeff.values[0] = 0.0; // x
+				modelCoeff.values[1] = -1.0; // y
+				modelCoeff.values[2] = 0.0; // z
+				modelCoeff.values[3] = 0.0; // d
+
+				cld->addPlane(modelCoeff, "ground_test_plane");
+
 				cld_init = !cld_init;
 			}
 
