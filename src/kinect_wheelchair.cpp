@@ -35,6 +35,8 @@
 *
 */
 
+#define _USE_MATH_DEFINES
+
 #include <boost/thread/thread.hpp>
 #define MEASURE_FUNCTION_TIME
 #include <pcl/common/time.h> //fps calculations
@@ -45,6 +47,7 @@
 #include <pcl/console/print.h>
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
+
 
 #define SHOW_FPS 1
 #if SHOW_FPS
@@ -205,15 +208,24 @@ int
 				// first run
 				cld->getRenderWindow ()->SetSize (g_cloud->width, g_cloud->height);
 				cld->getRenderWindow ()->SetPosition (g_cloud->width, 0);
-
-				pcl::ModelCoefficients modelCoeff;
-				modelCoeff.values.resize(4);
-				modelCoeff.values[0] = 0.0; // x
-				modelCoeff.values[1] = -1.0; // y
-				modelCoeff.values[2] = 0.0; // z
-				modelCoeff.values[3] = 0.0; // d
-
-				cld->addPlane(modelCoeff, "ground_test_plane");
+				
+				const float angle_min = 0;
+				const float angle_max = M_PI/2;
+				const int i_max = 10;
+				for (int i = 0; i < i_max; i++) {
+					const float curr_angle = angle_min + (angle_max - angle_min) * ((float)i / (float)i_max);	
+					const float xa(0.0);
+					printf("Angle: %f, zb: %f\n", curr_angle,  sin(curr_angle));
+					pcl::ModelCoefficients modelCoeff;
+					modelCoeff.values.resize(4);
+					modelCoeff.values[0] = xa; // x (a)
+					modelCoeff.values[1] = cos(curr_angle); // y (b)
+					modelCoeff.values[2] = sin(curr_angle); // z (c)
+					modelCoeff.values[3] = (float)i / 10; // d
+					
+					cld->addPlane(modelCoeff, "ground_test_plane" + i);
+					
+				}
 
 				cld_init = !cld_init;
 			}
