@@ -47,6 +47,7 @@
 #include <pcl/console/print.h>
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
+#include <pcl/sample_consensus/sac_model_plane.h>
 
 #include <string>
 
@@ -146,6 +147,33 @@ void
 	}
 }
 
+pcl::ModelCoefficients make_plane(const float angle, const float height) {
+	float xa(0.0), yb(0.0), zc(0.0), d(0.0), x0(0.0), y0(0.0), z0(0.0);
+	//printf("Angle: %f, zb: %f\n", angle,  sin(angle));
+	pcl::ModelCoefficients modelCoeff;
+	modelCoeff.values.resize(4);
+					
+	y0 = height;
+
+	yb = cos(angle); // y (b)
+	zc = sin(angle); // z (c)
+
+	yb = yb / sqrt((yb * yb) + (zc *  zc));
+	zc = zc / sqrt((yb * yb) + (zc *  zc));
+											
+	d = -(xa * x0) - (yb * y0) - (zc * z0); // d
+
+	//d = ((float)height) / (sin(curr_angle) + ((cos(curr_angle) * cos(curr_angle)) / sin(curr_angle)));
+
+	modelCoeff.values[0] = xa; // x (a)
+	modelCoeff.values[1] = yb;
+	modelCoeff.values[2] = zc;
+	modelCoeff.values[3] = d;
+
+	return modelCoeff;
+
+}
+
 /* ---[ */
 int
 	main (int argc, char** argv)
@@ -191,6 +219,10 @@ int
 #endif 
 
 	viewer->start();
+
+	float best_height(0.0), best_angle(0.0);
+	int best_count(0);
+
 	bool cld_init = false;
 	// Loop
 	while (!cld->wasStopped ())
@@ -215,44 +247,52 @@ int
 				const float angle_min = 0;
 				const float angle_max = M_PI/6;
 				const int i_max = 10;
-
+			
 				// sensible height range for sensor on zpler lvl 3 desk
 				for(float height = 0.25; height < 1.05; height += 0.1) {
-				
 					for (int i = 0; i < i_max; i++) {
 					//int i = 0;
 						const float curr_angle = angle_min + (angle_max - angle_min) * ((float)i / (float)i_max);	
-						float xa(0.0), yb(0.0), zc(0.0), d(0.0), x0(0.0), y0(0.0), z0(0.0);
-						printf("Angle: %f, zb: %f\n", curr_angle,  sin(curr_angle));
-						pcl::ModelCoefficients modelCoeff;
-						modelCoeff.values.resize(4);
-					
-						y0 = height;
-
-						yb = cos(curr_angle); // y (b)
-						zc = sin(curr_angle); // z (c)
-
-						yb = yb / sqrt((yb * yb) + (zc *  zc));
-						zc = zc / sqrt((yb * yb) + (zc *  zc));
-											
-						d = -(xa * x0) - (yb * y0) - (zc * z0); // d
-
-						//d = ((float)height) / (sin(curr_angle) + ((cos(curr_angle) * cos(curr_angle)) / sin(curr_angle)));
-
-						modelCoeff.values[0] = xa; // x (a)
-						modelCoeff.values[1] = yb;
-						modelCoeff.values[2] = zc;
-						modelCoeff.values[3] = d;
-
-						char name[50];
-
-						sprintf(name, "gtp_%d_%f", i, height);
+						pcl::ModelCoefficients modelCoeff = make_plane(curr_angle, height);
 						
-						printf("Name: %s\n==============\n", name);
+						Eigen::VectorXf model_coeff_eigen(4);
+						model_coeff_eigen[0] = modelCoeff.values[0];
+						model_coeff_eigen[1] = modelCoeff.values[1];
+						model_coeff_eigen[2] = modelCoeff.values[2];
+						model_coeff_eigen[3] = modelCoeff.values[3];
+						
+						pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
+						int count_in_dist = sample_plane.countWithinDistance(model_coeff_eigen, 0.1);
+						printf("Angle: %f Height: %f Count: %d\n", curr_angle, height, count_in_dist);
 
-						cld->addPlane(modelCoeff, name);
+						if(count_in_dist > best_count) {
+							best_count = count_in_dist;
+							best_height = height;
+							best_angle = curr_angle;
+						}
+
+						//char name[50];
+						//sprintf(name, "gtp_%d_%f", i, height);
+						//printf("Name: %s\n==============\n", name);
+						//cld->addPlane(modelCoeff, name);
 					}
 				}
+
+				char best_name[50];
+				sprintf(best_name, "gtp_%f_%f", best_angle, best_height);
+				//printf("Name: %s\n==============\n", name);
+				pcl::ModelCoefficients best_model_coeff = make_plane(best_angle, best_height);
+				cld->addPlane(best_model_coeff, best_name);
+
+				Eigen::VectorXf best_model_coeff_eigen(4);
+				best_model_coeff_eigen[0] = best_model_coeff.values[0];
+				best_model_coeff_eigen[1] = best_model_coeff.values[1];
+				best_model_coeff_eigen[2] = best_model_coeff.values[2];
+				best_model_coeff_eigen[3] = best_model_coeff.values[3];
+
+				std::vector<int> inliers;
+				pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
+				sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.1, inliers);
 
 				cld_init = !cld_init;
 			}
