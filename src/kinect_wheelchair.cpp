@@ -223,6 +223,7 @@ int
 
 	float best_height(0.0), best_angle(0.0);
 	int best_count(0);
+	Eigen::VectorXf best_model_coeff_eigen(4);
 
 	bool cld_init = false;
 	// Loop
@@ -285,28 +286,30 @@ int
 				pcl::ModelCoefficients best_model_coeff = make_plane(best_angle, best_height);
 				cld->addPlane(best_model_coeff, best_name);
 
-				Eigen::VectorXf best_model_coeff_eigen(4);
+				
 				best_model_coeff_eigen[0] = best_model_coeff.values[0];
 				best_model_coeff_eigen[1] = best_model_coeff.values[1];
 				best_model_coeff_eigen[2] = best_model_coeff.values[2];
 				best_model_coeff_eigen[3] = best_model_coeff.values[3];
 
-				std::vector<int> inliers;
-				pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
-				sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.1, inliers);
 
-				new_cloud = boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBA>>(new pcl::PointCloud<pcl::PointXYZRGBA>());
-				
-				*new_cloud += *g_cloud;
-
-
-				for(int i = 0; i < inliers.size(); i++) {
-					new_cloud->points[inliers[i]].r = 255;
-					new_cloud->points[inliers[i]].g = 0;
-					new_cloud->points[inliers[i]].b = 0;
-				}
 
 				cld_init = !cld_init;
+			}
+
+			std::vector<int> inliers;
+			pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
+			sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.08, inliers);
+
+			new_cloud = boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBA>>(new pcl::PointCloud<pcl::PointXYZRGBA>());
+				
+			*new_cloud += *g_cloud;
+
+
+			for(int i = 0; i < inliers.size(); i++) {
+				new_cloud->points[inliers[i]].r = 255;
+				new_cloud->points[inliers[i]].g = 0;
+				new_cloud->points[inliers[i]].b = 0;
 			}
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
