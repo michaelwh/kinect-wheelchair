@@ -76,6 +76,7 @@
 #endif
 
 boost::mutex cld_mutex, img_mutex;
+pcl::PointCloud<pcl::PointXYZRGBA>::Ptr new_cloud;
 pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr g_cloud;
 boost::shared_ptr<openni_wrapper::Image> g_image;
 
@@ -294,13 +295,24 @@ int
 				pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
 				sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.1, inliers);
 
+				new_cloud = boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBA>>(new pcl::PointCloud<pcl::PointXYZRGBA>());
+				
+				*new_cloud += *g_cloud;
+
+
+				for(int i = 0; i < inliers.size(); i++) {
+					new_cloud->points[inliers[i]].r = 255;
+					new_cloud->points[inliers[i]].g = 0;
+					new_cloud->points[inliers[i]].b = 0;
+				}
+
 				cld_init = !cld_init;
 			}
 
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (g_cloud);
-			if (!cld->updatePointCloud (g_cloud, handler, "OpenNICloud"))
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
+			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
 			{
-				cld->addPointCloud (g_cloud, handler, "OpenNICloud");
+				cld->addPointCloud (new_cloud, handler, "OpenNICloud");
 				cld->resetCameraViewpoint ("OpenNICloud");
 			}
 			cld_mutex.unlock ();
