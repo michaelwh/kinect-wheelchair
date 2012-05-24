@@ -76,9 +76,27 @@
 #endif
 
 boost::mutex cld_mutex, img_mutex;
-pcl::PointCloud<pcl::PointXYZRGBA>::Ptr new_cloud;
+pcl::PointCloud<pcl::PointXYZRGBA>::Ptr new_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
 pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr g_cloud;
 boost::shared_ptr<openni_wrapper::Image> g_image;
+
+// Create the PCLVisualizer object
+boost::shared_ptr<pcl::visualization::PCLVisualizer> cld;
+#if !((VTK_MAJOR_VERSION == 5)&&(VTK_MINOR_VERSION <= 4))
+boost::shared_ptr<pcl::visualization::ImageViewer> img;
+#endif
+
+bool status_text_set = false;
+
+void setStatusText(const std::string& text, int viewport = 0) 
+{
+	if(status_text_set)
+		cld->removeText3D("status_text", viewport);
+	else
+		status_text_set = true;
+
+	cld->addText(text, 0, 0, "status_text", viewport);
+}
 
 void
 	printHelp (int argc, char **argv)
@@ -94,11 +112,7 @@ void
 	print_info ("\n");
 }
 
-// Create the PCLVisualizer object
-boost::shared_ptr<pcl::visualization::PCLVisualizer> cld;
-#if !((VTK_MAJOR_VERSION == 5)&&(VTK_MINOR_VERSION <= 4))
-boost::shared_ptr<pcl::visualization::ImageViewer> img;
-#endif
+
 
 struct EventHelper
 {
@@ -148,7 +162,7 @@ void
 	}
 }
 
-pcl::ModelCoefficients make_plane(const float angle, const float height) {
+pcl::ModelCoefficients make_plane(float angle, float height) {
 	float xa(0.0), yb(0.0), zc(0.0), d(0.0), x0(0.0), y0(0.0), z0(0.0);
 	//printf("Angle: %f, zb: %f\n", angle,  sin(angle));
 	pcl::ModelCoefficients modelCoeff;
@@ -172,6 +186,59 @@ pcl::ModelCoefficients make_plane(const float angle, const float height) {
 	modelCoeff.values[3] = d;
 
 	return modelCoeff;
+
+}
+
+void detect_ground_plane_brute_force(const pcl::PointCloud<pcl::PointXYZRGBA>& cloud, Eigen::VectorXf& best_plane_coeffs) {
+	const float angle_min = 0;
+	const float angle_max = M_PI/6;
+	const int i_max = 10;
+
+	float best_height(0.0), best_angle(0.0);
+	int best_count(0);
+			
+	// sensible height range for sensor on zpler lvl 3 desk
+	for(float height = 0.25; height < 1.05; height += 0.1) {
+		for (int i = 0; i < i_max; i++) {
+		//int i = 0;
+			const float curr_angle = angle_min + (angle_max - angle_min) * ((float)i / (float)i_max);	
+			pcl::ModelCoefficients modelCoeff = make_plane(curr_angle, height);
+						
+			Eigen::VectorXf model_coeff_eigen(4);
+			model_coeff_eigen[0] = modelCoeff.values[0];
+			model_coeff_eigen[1] = modelCoeff.values[1];
+			model_coeff_eigen[2] = modelCoeff.values[2];
+			model_coeff_eigen[3] = modelCoeff.values[3];
+						
+			pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
+			int count_in_dist = sample_plane.countWithinDistance(model_coeff_eigen, 0.1);
+			printf("Angle: %f Height: %f Count: %d\n", curr_angle, height, count_in_dist);
+
+			if(count_in_dist > best_count) {
+				best_count = count_in_dist;
+				best_height = height;
+				best_angle = curr_angle;
+			}
+
+			//char name[50];
+			//sprintf(name, "gtp_%d_%f", i, height);
+			//printf("Name: %s\n==============\n", name);
+			//cld->addPlane(modelCoeff, name);
+		}
+	}
+
+	//char best_name[50];
+	//sprintf(best_name, "gtp_%f_%f", best_angle, best_height);
+	//printf("Name: %s\n==============\n", name);
+	pcl::ModelCoefficients best_model_coeff = make_plane(best_angle, best_height);
+	//cld->addPlane(best_model_coeff, best_name);
+
+	
+	best_plane_coeffs.resize(4);
+	best_plane_coeffs[0] = best_model_coeff.values[0];
+	best_plane_coeffs[1] = best_model_coeff.values[1];
+	best_plane_coeffs[2] = best_model_coeff.values[2];
+	best_plane_coeffs[3] = best_model_coeff.values[3];
 
 }
 
@@ -221,8 +288,6 @@ int
 
 	viewer->start();
 
-	float best_height(0.0), best_angle(0.0);
-	int best_count(0);
 	Eigen::VectorXf best_model_coeff_eigen(4);
 
 	bool cld_init = false;
@@ -245,72 +310,27 @@ int
 				cld->getRenderWindow ()->SetSize (g_cloud->width, g_cloud->height);
 				cld->getRenderWindow ()->SetPosition (g_cloud->width, 0);
 				
-
-				const float angle_min = 0;
-				const float angle_max = M_PI/6;
-				const int i_max = 10;
-			
-				// sensible height range for sensor on zpler lvl 3 desk
-				for(float height = 0.25; height < 1.05; height += 0.1) {
-					for (int i = 0; i < i_max; i++) {
-					//int i = 0;
-						const float curr_angle = angle_min + (angle_max - angle_min) * ((float)i / (float)i_max);	
-						pcl::ModelCoefficients modelCoeff = make_plane(curr_angle, height);
-						
-						Eigen::VectorXf model_coeff_eigen(4);
-						model_coeff_eigen[0] = modelCoeff.values[0];
-						model_coeff_eigen[1] = modelCoeff.values[1];
-						model_coeff_eigen[2] = modelCoeff.values[2];
-						model_coeff_eigen[3] = modelCoeff.values[3];
-						
-						pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
-						int count_in_dist = sample_plane.countWithinDistance(model_coeff_eigen, 0.1);
-						printf("Angle: %f Height: %f Count: %d\n", curr_angle, height, count_in_dist);
-
-						if(count_in_dist > best_count) {
-							best_count = count_in_dist;
-							best_height = height;
-							best_angle = curr_angle;
-						}
-
-						//char name[50];
-						//sprintf(name, "gtp_%d_%f", i, height);
-						//printf("Name: %s\n==============\n", name);
-						//cld->addPlane(modelCoeff, name);
-					}
-				}
-
-				char best_name[50];
-				sprintf(best_name, "gtp_%f_%f", best_angle, best_height);
-				//printf("Name: %s\n==============\n", name);
-				pcl::ModelCoefficients best_model_coeff = make_plane(best_angle, best_height);
-				cld->addPlane(best_model_coeff, best_name);
-
-				
-				best_model_coeff_eigen[0] = best_model_coeff.values[0];
-				best_model_coeff_eigen[1] = best_model_coeff.values[1];
-				best_model_coeff_eigen[2] = best_model_coeff.values[2];
-				best_model_coeff_eigen[3] = best_model_coeff.values[3];
-
-
+				//detect_ground_plane_brute_force(*g_cloud, best_model_coeff_eigen);
 
 				cld_init = !cld_init;
 			}
 
-			std::vector<int> inliers;
-			pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
-			sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.08, inliers);
+			//setStatusText("Calculating ground points...");
+			//std::vector<int> inliers;
+			//pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
+			//sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.08, inliers);
+			
+			pcl::copyPointCloud(*g_cloud, *new_cloud);
 
-			new_cloud = boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBA>>(new pcl::PointCloud<pcl::PointXYZRGBA>());
-				
-			*new_cloud += *g_cloud;
+			//*new_cloud += *g_cloud;
 
+			//setStatusText("Setting ground points...");
+			//for(int i = 0; i < inliers.size(); i++) {
+			//	new_cloud->points[inliers[i]].r = 255;
+			//	new_cloud->points[inliers[i]].g = 0;
+			//	new_cloud->points[inliers[i]].b = 0;
+			//}
 
-			for(int i = 0; i < inliers.size(); i++) {
-				new_cloud->points[inliers[i]].r = 255;
-				new_cloud->points[inliers[i]].g = 0;
-				new_cloud->points[inliers[i]].b = 0;
-			}
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
 			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
