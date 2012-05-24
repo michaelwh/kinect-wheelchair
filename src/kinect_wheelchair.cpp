@@ -48,6 +48,12 @@
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
+#include <pcl/sample_consensus/sac_model_perpendicular_plane.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/common/angles.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/extract_indices.h>
 
 #include <string>
 
@@ -242,6 +248,7 @@ void detect_ground_plane_brute_force(const pcl::PointCloud<pcl::PointXYZRGBA>& c
 
 }
 
+
 /* ---[ */
 int
 	main (int argc, char** argv)
@@ -288,7 +295,7 @@ int
 
 	viewer->start();
 
-	Eigen::VectorXf best_model_coeff_eigen(4);
+	Eigen::VectorXf ground_plane_model_coeffs(4);
 
 	bool cld_init = false;
 	// Loop
@@ -310,7 +317,7 @@ int
 				cld->getRenderWindow ()->SetSize (g_cloud->width, g_cloud->height);
 				cld->getRenderWindow ()->SetPosition (g_cloud->width, 0);
 				
-				//detect_ground_plane_brute_force(*g_cloud, best_model_coeff_eigen);
+				//detect_ground_plane_brute_force(*g_cloud, ground_plane_model_coeffs);
 
 				cld_init = !cld_init;
 			}
@@ -318,18 +325,103 @@ int
 			//setStatusText("Calculating ground points...");
 			//std::vector<int> inliers;
 			//pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
-			//sample_plane.selectWithinDistance(best_model_coeff_eigen, 0.08, inliers);
+			//sample_plane.selectWithinDistance(ground_plane_model_coeffs, 0.08, inliers);
 			
 			pcl::copyPointCloud(*g_cloud, *new_cloud);
 
+			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>()); // used for results of filters we don't want to save to new_cloud
+
+			// -------------------------------
+			// filter cloud to cut out ceiling
+			// -------------------------------
+			pcl::PassThrough<pcl::PointXYZRGBA> pt_filter(false); // we don't need extracted indicies, if we did we would give true to constructor
+			pt_filter.setInputCloud(new_cloud);
+			pt_filter.setFilterFieldName("y");
+			pt_filter.setFilterLimits(-0.8, 10.0);
+			pt_filter.setFilterLimitsNegative(false);
+			pt_filter.filter(*new_cloud);
+			//pt_filter.filter(*temp_cloud);
+			//pcl::IndicesConstPtr no_ceil_indicies = pt_filter.getRemovedIndices();
+			// ------------------------------------------------------------------------
+			// filter cloud to cut out close things that mess with our ground detection
+			// ------------------------------------------------------------------------
+			pt_filter.setFilterFieldName("z");
+			pt_filter.setFilterLimits(0.0, 1.0);
+			pt_filter.setFilterLimitsNegative(true);
+			pt_filter.filter(*new_cloud);
+			
+			
+			
+			// some code here taken from: http://pointclouds.org/documentation/tutorials/extract_indices.php#extract-indices
+			// and http://pointclouds.org/documentation/tutorials/planar_segmentation.php#planar-segmentation
+			// downsample the data to speed stuff up
+
+			//pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter;
+			//vox_filter.setInputCloud(new_cloud);
+			//vox_filter.setLeafSize(0.1, 0.1, 0.1);
+			//vox_filter.filter(*new_cloud);
+
+
+
+
+			pcl::ModelCoefficients floor_coefficients;
+			pcl::PointIndices::Ptr floor_inliers(new pcl::PointIndices());
+			// Create the segmentation object
+			pcl::SACSegmentation<pcl::PointXYZRGBA> seg;
+			// Optional
+			seg.setOptimizeCoefficients (true);
+			// Mandatory
+			seg.setModelType (pcl::SACMODEL_PERPENDICULAR_PLANE);
+			seg.setMethodType (pcl::SAC_RANSAC);
+			seg.setDistanceThreshold (0.04);
+			seg.setAxis(Eigen::Vector3f(0.0, 1.0, 0.0));
+			seg.setEpsAngle(pcl::deg2rad(10.0));
+
+			seg.setInputCloud(new_cloud);
+			//seg.setIndices(no_ceil_indicies);
+			seg.segment(*floor_inliers, floor_coefficients);
+
+
+			if (floor_inliers->indices.size () == 0)
+			{
+				PCL_ERROR ("Could not estimate a planar model for the given dataset.");
+			} else {
+				/*pcl::ExtractIndices<pcl::PointXYZRGBA> extract;
+				extract.setInputCloud(new_cloud);
+				extract.setIndices(inliers);
+				extract.setNegative(true);
+				extract.filter(*new_cloud);*/
+			}
+		
+			//setStatusText("Setting ground points...");
+			for(int i = 0; i < floor_inliers->indices.size(); i++) {
+				new_cloud->points[floor_inliers->indices[i]].r = 255;
+				new_cloud->points[floor_inliers->indices[i]].g = 0;
+				new_cloud->points[floor_inliers->indices[i]].b = 0;
+			}
+			
+
+			
+			//std::vector<int> cloud_indicies(new_cloud->size());
+			//for(int i = 0; i < new_cloud->size(); i++)
+			//	cloud_indicies[i] = i;
+
+			
+			//pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZRGBA> ground_plane_model(new_cloud);
+			//ground_plane_model.setAxis(Eigen::Vector3f(0.0, 1.0, 0.0));
+			//ground_plane_model.setEpsAngle(pcl::deg2rad(15.0));
+			//ground_plane_model.computeModelCoefficients(cloud_indicies, ground_plane_model_coeffs);
+			//std::vector<int> ground_inliers;
+			//ground_plane_model.selectWithinDistance(ground_plane_model_coeffs, 0.01, ground_inliers);
+
+
+
+
+
+
 			//*new_cloud += *g_cloud;
 
-			//setStatusText("Setting ground points...");
-			//for(int i = 0; i < inliers.size(); i++) {
-			//	new_cloud->points[inliers[i]].r = 255;
-			//	new_cloud->points[inliers[i]].g = 0;
-			//	new_cloud->points[inliers[i]].b = 0;
-			//}
+
 
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
