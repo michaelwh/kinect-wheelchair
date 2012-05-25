@@ -55,6 +55,7 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/common/eigen.h>
+#include <pcl/filters/crop_box.h>
 
 #include <string>
 
@@ -320,6 +321,18 @@ int
 				
 				//detect_ground_plane_brute_force(*g_cloud, ground_plane_model_coeffs);
 
+				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(15.0), 0.0, 1.0, 0.0), 0.1, 3.0, 10.0, "cube_test_ang_max");
+				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(-15.0), 0.0, 1.0, 0.0), 0.1, 3.0, 10.0, "cube_test_ang_min");
+				{
+					int name_i = 0;
+					for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
+						char name[50];
+						sprintf(name, "decimation_cube_test_%d", name_i);
+						cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
+						name_i++;
+					}
+				}
+
 				cld_init = !cld_init;
 			}
 
@@ -450,19 +463,66 @@ int
 			//ground_plane_model.selectWithinDistance(ground_plane_model_coeffs, 0.01, ground_inliers);
 
 
+			
+		
 
-
-
-
-			//*new_cloud += *g_cloud;
-
-			cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(0.0, 0.0, 0.0, 0.0), 1.0, 1.0, 1.0, "cube_test");
-
-
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (object_detection_cloud);
-			if (!cld->updatePointCloud (object_detection_cloud, handler, "OpenNICloud"))
+			
+		//	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
+		
+			
 			{
-				cld->addPointCloud (object_detection_cloud, handler, "OpenNICloud");
+
+				int name_i = 0;
+				for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
+					//char name[50];
+					//sprintf(name, "decimation_cube_test_%d", name_i);
+					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
+
+					Eigen::Vector4f boxmin;//(-0.25, -(3.0/2.0), -5.0);
+					boxmin.resize(3);
+					boxmin[0] = -0.25;
+					boxmin[1] = -(3.0/2.0);
+					boxmin[2] = -5.0;
+					Eigen::Vector4f boxmax;
+					boxmax.resize(3);
+					boxmax[0] = 0.25;
+					boxmax[1] = 3.0/2.0;
+					boxmax[2] = 5.0;
+
+					Eigen::Vector3f boxrotate;
+					boxrotate.resize(3);
+					boxrotate[0] = 0.0;
+					boxrotate[1] = pcl::deg2rad(angle * 2.0); // for some reason needs to be multiplied by 2
+					boxrotate[2] = 0.0;
+ 
+					std::vector<int> cropped_indicies;
+					pcl::CropBox<pcl::PointXYZRGBA> chair_crop_box;
+					chair_crop_box.setInputCloud(new_cloud);
+					chair_crop_box.setMin(boxmin);
+					chair_crop_box.setMax(boxmax);
+					chair_crop_box.setRotation(boxrotate);
+					chair_crop_box.filter(cropped_indicies);
+			
+					for(int i = 0; i < cropped_indicies.size(); i++) {
+						new_cloud->points[cropped_indicies[i]].r = 0;
+						if(name_i % 2 == 0) {
+							new_cloud->points[cropped_indicies[i]].g = 0;
+							new_cloud->points[cropped_indicies[i]].b = 255;
+						} else {
+							new_cloud->points[cropped_indicies[i]].g = 255;
+							new_cloud->points[cropped_indicies[i]].b = 0;
+						}
+						
+					}
+
+					name_i++;
+				}
+			}
+
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
+			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
+			{
+				cld->addPointCloud (new_cloud, handler, "OpenNICloud");
 				cld->resetCameraViewpoint ("OpenNICloud");
 			}
 			cld_mutex.unlock ();
