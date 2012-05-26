@@ -35,7 +35,7 @@
 *
 */
 
-#define _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES // enables M_PI
 
 #include <boost/thread/thread.hpp>
 #define MEASURE_FUNCTION_TIME
@@ -95,6 +95,10 @@ boost::shared_ptr<pcl::visualization::ImageViewer> img;
 #endif
 
 bool status_text_set = false;
+
+float detection_box_x = 0.5f;
+float detection_box_y = 3.0f;
+float detection_box_z = 10.0f;
 
 void setStatusText(const std::string& text, int viewport = 0) 
 {
@@ -194,7 +198,6 @@ pcl::ModelCoefficients make_plane(float angle, float height) {
 	modelCoeff.values[3] = d;
 
 	return modelCoeff;
-
 }
 
 void detect_ground_plane_brute_force(const pcl::PointCloud<pcl::PointXYZRGBA>& cloud, Eigen::VectorXf& best_plane_coeffs) {
@@ -247,9 +250,7 @@ void detect_ground_plane_brute_force(const pcl::PointCloud<pcl::PointXYZRGBA>& c
 	best_plane_coeffs[1] = best_model_coeff.values[1];
 	best_plane_coeffs[2] = best_model_coeff.values[2];
 	best_plane_coeffs[3] = best_model_coeff.values[3];
-
 }
-
 
 /* ---[ */
 int
@@ -432,8 +433,6 @@ int
 					new_cloud->points[new_cloud_floor_inliers[i]].g = 0;
 					new_cloud->points[new_cloud_floor_inliers[i]].b = 0;
 				}
-
-				
 			
 				pcl::ExtractIndices<pcl::PointXYZRGBA> extract;
 				extract.setInputCloud(new_cloud);
@@ -470,12 +469,8 @@ int
 			//std::vector<int> ground_inliers;
 			//ground_plane_model.selectWithinDistance(ground_plane_model_coeffs, 0.01, ground_inliers);
 
-
-			
-		
-
-			
-		//	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
+	
+			//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
 		
 			
 			{
@@ -491,14 +486,14 @@ int
 
 					Eigen::Vector4f boxmin;//(-0.25, -(3.0/2.0), -5.0);
 					boxmin.resize(3);
-					boxmin[0] = -0.25;
-					boxmin[1] = -(3.0/2.0);
-					boxmin[2] = -5.0;
+					boxmin[0] = -(detection_box_x / 2.0f);
+					boxmin[1] = -(detection_box_y / 2.0f);
+					boxmin[2] = -(detection_box_z / 2.0f);
 					Eigen::Vector4f boxmax;
 					boxmax.resize(3);
-					boxmax[0] = 0.25;
-					boxmax[1] = 3.0/2.0;
-					boxmax[2] = 5.0;
+					boxmax[0] = detection_box_x / 2.0f;
+					boxmax[1] = detection_box_y / 2.0f;
+					boxmax[2] = detection_box_z / 2.0f;
 
 					Eigen::Vector3f boxrotate;
 					boxrotate.resize(3);
@@ -546,7 +541,7 @@ int
 				printf("BEST: %d indicies at %f degrees\n", most_indicies, best_angle);
 
 				cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
-				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
+				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
 				
 			}
 
