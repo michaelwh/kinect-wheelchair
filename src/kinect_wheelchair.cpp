@@ -334,10 +334,12 @@ int
 					//}
 				//}
 
-				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(90.0), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
+				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(90.0), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
 
 				cld_init = !cld_init;
 			}
+			
+			cld->removeAllShapes();
 
 			//setStatusText("Calculating ground points...");
 			//std::vector<int> inliers;
@@ -540,7 +542,7 @@ int
 
 				printf("BEST: %d indicies at %f degrees\n", most_indicies, best_angle);
 
-				cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
+				//cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
 				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
 				
 			}
