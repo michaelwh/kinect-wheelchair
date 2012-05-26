@@ -343,7 +343,14 @@ int
 			//pcl::SampleConsensusModelPlane<pcl::PointXYZRGBA> sample_plane(g_cloud);
 			//sample_plane.selectWithinDistance(ground_plane_model_coeffs, 0.08, inliers);
 			
-			pcl::copyPointCloud(*g_cloud, *new_cloud);
+
+
+			//pcl::copyPointCloud(*g_cloud, *new_cloud);
+
+			pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter;
+			vox_filter.setInputCloud(g_cloud);
+			vox_filter.setLeafSize(0.05f, 0.05f, 0.05f);
+			vox_filter.filter(*new_cloud);
 
 			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr ground_detection_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>()); // the point cloud to be used for the ground plane detection
 
@@ -542,6 +549,7 @@ int
 				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
 				
 			}
+
 
 
 
