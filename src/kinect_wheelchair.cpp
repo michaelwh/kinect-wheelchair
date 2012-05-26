@@ -56,6 +56,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/common/eigen.h>
 #include <pcl/filters/crop_box.h>
+#include <pcl/filters/project_inliers.h>
 
 #include <string>
 
@@ -446,12 +447,18 @@ int
 				extract.setNegative(false);
 				extract.filter(*ground_cloud);
 
-
 				// later we should try to transform the point cloud to lie flat (i.e. rotate it)
 				// what about this http://steve.hollasch.net/cgindex/math/rotvecs.html
 			}
 
 
+			// crop the object detection cloud to remove the ceiling
+			pcl::PassThrough<pcl::PointXYZRGBA> pt_object_filter(false); // we don't need extracted indicies, if we did we would give true to constructor
+			pt_filter.setInputCloud(object_detection_cloud);
+			pt_filter.setFilterFieldName("y");
+			pt_filter.setFilterLimits(-1.5f, 10.0f);
+			pt_filter.setFilterLimitsNegative(false);
+			pt_filter.filter(*object_detection_cloud);
 
 		
 			//setStatusText("Setting ground points...");
@@ -533,9 +540,7 @@ int
 						best_angle = angle;
 					}
 					
-					
 					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, name);
-					
 
 					name_i++;
 				}
@@ -549,10 +554,71 @@ int
 				
 			}
 
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
-			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
+
+
+			
+			// -------------------------
+			// BEGIN Occupancy map stuff
+			// -------------------------
+
+			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr ground_occmap_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
+
+			// we now filter the ground cloud again using a VoxelGrid filter with a large y value to
+			// squash everything to a plane. This is similar to projecting it onto the plane but it also
+			// makes everything into a nice evenly spaced grid which is what we want
+			pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter_ground_occmap;
+			vox_filter_ground_occmap.setInputCloud(ground_cloud);
+			vox_filter_ground_occmap.setLeafSize(0.05f, 10.0f, 0.05f);
+			vox_filter_ground_occmap.filter(*ground_occmap_cloud);
+
+			//ground_occmap_cloud->points[0].x
+
+
+			// we now project the object detection cloud (the cloud without the floor and with the ceiling removed)
+			// onto the floor plane
+			
+			pcl::ModelCoefficients::Ptr floor_coeff_ptr(new pcl::ModelCoefficients());
+			floor_coeff_ptr->values.resize(4);
+			floor_coeff_ptr->values[0] = floor_coefficients.values[0];
+			floor_coeff_ptr->values[1] = floor_coefficients.values[1];
+			floor_coeff_ptr->values[2] = floor_coefficients.values[2];
+			floor_coeff_ptr->values[3] = floor_coefficients.values[3];
+
+			pcl::ProjectInliers<pcl::PointXYZRGBA> ground_proj;
+			ground_proj.setModelType(pcl::SACMODEL_PERPENDICULAR_PLANE);
+			ground_proj.setInputCloud(object_detection_cloud);
+			ground_proj.setModelCoefficients(floor_coeff_ptr);
+			ground_proj.filter(*object_detection_cloud);
+
+
+			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr object_occmap_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
+
+			// now we do some VoxelGridding to make it a nice even grid
+			pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter_object_occmap;
+			vox_filter_ground_occmap.setInputCloud(object_detection_cloud);
+			vox_filter_ground_occmap.setLeafSize(0.05f, 0.05f, 0.05f);
+			vox_filter_ground_occmap.filter(*object_occmap_cloud);
+
+			 
+
+
+			// -----------------------
+			// END Occupancy map stuff
+			// -----------------------
+
+			////*object_occmap_cloud += *ground_occmap_cloud; // visualise both occupancy maps on top of each other
+			
+			//std::cout << "Point cloud size: " << object_occmap_cloud->points.size() << std::endl;
+
+			//for (std::vector<pcl::PointXYZRGBA>::size_type point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
+
+			//}
+			
+
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (object_occmap_cloud);
+			if (!cld->updatePointCloud (object_occmap_cloud, handler, "OpenNICloud"))
 			{
-				cld->addPointCloud (new_cloud, handler, "OpenNICloud");
+				cld->addPointCloud (object_occmap_cloud, handler, "OpenNICloud");
 				cld->resetCameraViewpoint ("OpenNICloud");
 			}
 			cld_mutex.unlock ();
