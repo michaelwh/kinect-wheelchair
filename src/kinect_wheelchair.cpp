@@ -323,15 +323,17 @@ int
 
 				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(15.0), 0.0, 1.0, 0.0), 0.1, 3.0, 10.0, "cube_test_ang_max");
 				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(-15.0), 0.0, 1.0, 0.0), 0.1, 3.0, 10.0, "cube_test_ang_min");
-				{
-					int name_i = 0;
-					for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
-						char name[50];
-						sprintf(name, "decimation_cube_test_%d", name_i);
-						cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
-						name_i++;
-					}
-				}
+				//{
+					//int name_i = 0;
+					//for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
+						//char name[50];
+						//sprintf(name, "decimation_cube_test_%d", name_i);
+						//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
+						//name_i++;
+					//}
+				//}
+
+				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(90.0), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
 
 				cld_init = !cld_init;
 			}
@@ -370,14 +372,10 @@ int
 			// some code here taken from: http://pointclouds.org/documentation/tutorials/extract_indices.php#extract-indices
 			// and http://pointclouds.org/documentation/tutorials/planar_segmentation.php#planar-segmentation
 			// downsample the data to speed stuff up
-
-			/*pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter;
-			vox_filter.setInputCloud(new_cloud);
-			vox_filter.setLeafSize(0.1, 0.1, 0.1);
-			vox_filter.filter(*new_cloud);*/
-
-
-
+			//pcl::VoxelGrid<pcl::PointXYZRGBA> vox_filter;
+			//vox_filter.setInputCloud(new_cloud);
+			//vox_filter.setLeafSize(0.1, 0.1, 0.1);
+			//vox_filter.filter(*new_cloud);
 
 			pcl::ModelCoefficients floor_coefficients;
 			pcl::PointIndices::Ptr ground_cloud_floor_inliers(new pcl::PointIndices());
@@ -397,6 +395,7 @@ int
 			seg.segment(*ground_cloud_floor_inliers, floor_coefficients);
 
 			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr object_detection_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
+			pcl::PointCloud<pcl::PointXYZRGBA>::Ptr ground_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
 			
 
 			if (ground_cloud_floor_inliers->indices.size () == 0)
@@ -436,6 +435,8 @@ int
 				extract.setIndices(new_cloud_floor_inliers_ptr);
 				extract.setNegative(true);
 				extract.filter(*object_detection_cloud);
+				extract.setNegative(false);
+				extract.filter(*ground_cloud);
 
 
 				// later we should try to transform the point cloud to lie flat (i.e. rotate it)
@@ -471,11 +472,14 @@ int
 		
 			
 			{
-
+				
+				int most_indicies = 0;
+				float best_angle = 0;
+				
 				int name_i = 0;
 				for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
-					//char name[50];
-					//sprintf(name, "decimation_cube_test_%d", name_i);
+					char name[50];
+					sprintf(name, "decimation_cube_test_%d", name_i);
 					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
 
 					Eigen::Vector4f boxmin;//(-0.25, -(3.0/2.0), -5.0);
@@ -492,32 +496,54 @@ int
 					Eigen::Vector3f boxrotate;
 					boxrotate.resize(3);
 					boxrotate[0] = 0.0;
-					boxrotate[1] = pcl::deg2rad(angle * 2.0); // for some reason needs to be multiplied by 2
+					boxrotate[1] = pcl::deg2rad(angle * 2.0); // for some reason this needs to be multiplied by 2 to correspond to the cld->addCube quaterion angle
 					boxrotate[2] = 0.0;
  
 					std::vector<int> cropped_indicies;
 					pcl::CropBox<pcl::PointXYZRGBA> chair_crop_box;
-					chair_crop_box.setInputCloud(new_cloud);
+					//chair_crop_box.setInputCloud(object_detection_cloud);
+					chair_crop_box.setInputCloud(ground_cloud);
 					chair_crop_box.setMin(boxmin);
 					chair_crop_box.setMax(boxmax);
 					chair_crop_box.setRotation(boxrotate);
 					chair_crop_box.filter(cropped_indicies);
 			
-					for(int i = 0; i < cropped_indicies.size(); i++) {
-						new_cloud->points[cropped_indicies[i]].r = 0;
-						if(name_i % 2 == 0) {
-							new_cloud->points[cropped_indicies[i]].g = 0;
-							new_cloud->points[cropped_indicies[i]].b = 255;
-						} else {
-							new_cloud->points[cropped_indicies[i]].g = 255;
-							new_cloud->points[cropped_indicies[i]].b = 0;
-						}
-						
+					//if(name_i == 2) {
+					//	for(int i = 0; i < cropped_indicies.size(); i++) {
+					//		ground_cloud->points[cropped_indicies[i]].r = 0;
+					//		if(name_i % 2 == 0) {
+					//			ground_cloud->points[cropped_indicies[i]].g = 0;
+					//			ground_cloud->points[cropped_indicies[i]].b = 255;
+					//		} else {
+					//			ground_cloud->points[cropped_indicies[i]].g = 255;
+					//			ground_cloud->points[cropped_indicies[i]].b = 0;
+					//		}	
+					//	}
+					//	cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, name);
+					//}
+
+					printf("%d indicies at %f degrees\n", cropped_indicies.size(), angle);
+
+					if(cropped_indicies.size() > most_indicies) {
+						most_indicies = cropped_indicies.size();
+						best_angle = angle;
 					}
+					
+					
+					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, name);
+					
 
 					name_i++;
 				}
+
+				printf("BEST: %d indicies at %f degrees\n", most_indicies, best_angle);
+
+				cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
+				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
+				
 			}
+
+
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
 			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
