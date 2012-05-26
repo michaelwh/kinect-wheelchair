@@ -500,7 +500,7 @@ int
 					Eigen::Vector3f boxrotate;
 					boxrotate.resize(3);
 					boxrotate[0] = 0.0;
-					boxrotate[1] = pcl::deg2rad(angle * 2.0); // for some reason this needs to be multiplied by 2 to correspond to the cld->addCube quaterion angle
+					boxrotate[1] = pcl::deg2rad(angle * 2.0); // for some reason this needs to be multiplied by 2 to correspond to the cld->addCube(...) quaterion angle
 					boxrotate[2] = 0.0;
  
 					std::vector<int> cropped_indicies;
@@ -543,12 +543,11 @@ int
 				printf("BEST: %d indicies at %f degrees\n", most_indicies, best_angle);
 
 				//cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
+
+				// for some reason the the Quaterion must be -1 in the x axis for the same angle to rotate the same way as the cld->addCube(...) cubes...
 				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
 				
 			}
-
-
-
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
 			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
