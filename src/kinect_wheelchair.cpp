@@ -608,11 +608,15 @@ int
 
 			////*object_occmap_cloud += *ground_occmap_cloud; // visualise both occupancy maps on top of each other
 			
-			//std::cout << "Point cloud size: " << object_occmap_cloud->points.size() << std::endl;
 
-			//for (std::vector<pcl::PointXYZRGBA>::size_type point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
-
-			//}
+			// TODO: NEED TO BIN POINTS INTO AN X Y MATRIX. WE SHOULD CHOOSE STANDARD SIZED ARRAY FOR NOW SINCE WE
+			// WANT IT TO BE THE SAME BETWEEN ITERATIONS AND NOT DEPEND ON DATA (AT LEAST FOR NOW)
+			std::cout << "Object occmap point cloud size: " << object_occmap_cloud->points.size() << std::endl;
+			
+			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
+				// fill in our occupancy matrix here
+				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " y: " << object_occmap_cloud->points[point_index].y << " z: " << std::endl;
+			}
 			
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (object_occmap_cloud);
