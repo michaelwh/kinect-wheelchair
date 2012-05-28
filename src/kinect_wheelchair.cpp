@@ -58,6 +58,14 @@
 #include <pcl/filters/crop_box.h>
 #include <pcl/filters/project_inliers.h>
 
+//#include <iostream>
+#include <iomanip>
+#include <queue>
+#include <string>
+#include <math.h>
+#include <ctime>
+#include <cstdlib>
+#include <cstdio>
 
 //#include <pcl/io/pcd_io.h>
 
@@ -87,6 +95,222 @@
 }while(false)
 #endif
 
+
+ 
+// ================================================================================
+// Begin A* Algorithm. The code for this A* algorithm has been taken verbatim from:
+// http://code.activestate.com/recipes/577457-a-star-shortest-path-algorithm/
+// It is NOT our code
+// ================================================================================
+#if 0
+
+using namespace std;
+
+const int n=60; // horizontal size of the map
+const int m=60; // vertical size size of the map
+static int map[n][m];
+static int new_map[n][m];
+static int closed_nodes_map[n][m]; // map of closed (tried-out) nodes
+static int open_nodes_map[n][m]; // map of open (not-yet-tried) nodes
+static int dir_map[n][m]; // map of directions
+const int dir=8; // number of possible directions to go at any position
+// if dir==4
+//static int dx[dir]={1, 0, -1, 0};
+//static int dy[dir]={0, 1, 0, -1};
+// if dir==8
+static int dx[dir]={1, 1, 0, -1, -1, -1, 0, 1};
+static int dy[dir]={0, 1, 1, 1, 0, -1, -1, -1};
+
+class node
+{
+    // current position
+    int xPos;
+    int yPos;
+    // total distance already travelled to reach the node
+    int level;
+    // priority=level+remaining distance estimate
+    int priority;  // smaller: higher priority
+
+    public:
+        node(int xp, int yp, int d, int p) 
+            {xPos=xp; yPos=yp; level=d; priority=p;}
+    
+        int getxPos() const {return xPos;}
+        int getyPos() const {return yPos;}
+        int getLevel() const {return level;}
+        int getPriority() const {return priority;}
+
+        void updatePriority(const int & xDest, const int & yDest)
+        {
+             priority=level+estimate(xDest, yDest)*10; //A*
+        }
+
+        // give better priority to going strait instead of diagonally
+        void nextLevel(const int & i) // i: direction
+        {
+             level+=(dir==8?(i%2==0?10:14):10);
+        }
+        
+        // Estimation function for the remaining distance to the goal.
+        const int & estimate(const int & xDest, const int & yDest) const
+        {
+            static int xd, yd, d;
+            xd=xDest-xPos;
+            yd=yDest-yPos;         
+
+            // Euclidian Distance
+            d=static_cast<int>(sqrt(xd*xd+yd*yd));
+
+            // Manhattan distance
+            //d=abs(xd)+abs(yd);
+            
+            // Chebyshev distance
+            //d=max(abs(xd), abs(yd));
+
+            return(d);
+        }
+};
+
+// Determine priority (in the priority queue)
+bool operator<(const node & a, const node & b)
+{
+  return a.getPriority() > b.getPriority();
+}
+
+// A-star algorithm.
+// The route returned is a string of direction digits.
+string pathFind( const int & xStart, const int & yStart, 
+                 const int & xFinish, const int & yFinish )
+{
+    static priority_queue<node> pq[2]; // list of open (not-yet-tried) nodes
+    static int pqi; // pq index
+    static node* n0;
+    static node* m0;
+    static int i, j, x, y, xdx, ydy;
+    static char c;
+    pqi=0;
+
+    // reset the node maps
+    for(y=0;y<m;y++)
+    {
+        for(x=0;x<n;x++)
+        {
+            closed_nodes_map[x][y]=0;
+            open_nodes_map[x][y]=0;
+        }
+    }
+
+    // create the start node and push into list of open nodes
+    n0=new node(xStart, yStart, 0, 0);
+    n0->updatePriority(xFinish, yFinish);
+    pq[pqi].push(*n0);
+    open_nodes_map[x][y]=n0->getPriority(); // mark it on the open nodes map
+
+    // A* search
+    while(!pq[pqi].empty())
+    {
+        // get the current node w/ the highest priority
+        // from the list of open nodes
+        n0=new node( pq[pqi].top().getxPos(), pq[pqi].top().getyPos(), 
+                     pq[pqi].top().getLevel(), pq[pqi].top().getPriority());
+
+        x=n0->getxPos(); y=n0->getyPos();
+
+        pq[pqi].pop(); // remove the node from the open list
+        open_nodes_map[x][y]=0;
+        // mark it on the closed nodes map
+        closed_nodes_map[x][y]=1;
+
+        // quit searching when the goal state is reached
+        //if((*n0).estimate(xFinish, yFinish) == 0)
+        if(x==xFinish && y==yFinish) 
+        {
+            // generate the path from finish to start
+            // by following the directions
+            string path="";
+            while(!(x==xStart && y==yStart))
+            {
+                j=dir_map[x][y];
+                c='0'+(j+dir/2)%dir;
+                path=c+path;
+                x+=dx[j];
+                y+=dy[j];
+            }
+
+            // garbage collection
+            delete n0;
+            // empty the leftover nodes
+            while(!pq[pqi].empty()) pq[pqi].pop();           
+            return path;
+        }
+
+        // generate moves (child nodes) in all possible directions
+        for(i=0;i<dir;i++)
+        {
+            xdx=x+dx[i]; ydy=y+dy[i];
+
+            if(!(xdx<0 || xdx>n-1 || ydy<0 || ydy>m-1 || map[xdx][ydy]==1 
+                || closed_nodes_map[xdx][ydy]==1))
+            {
+                // generate a child node
+                m0=new node( xdx, ydy, n0->getLevel(), 
+                             n0->getPriority());
+                m0->nextLevel(i);
+                m0->updatePriority(xFinish, yFinish);
+
+                // if it is not in the open list then add into that
+                if(open_nodes_map[xdx][ydy]==0)
+                {
+                    open_nodes_map[xdx][ydy]=m0->getPriority();
+                    pq[pqi].push(*m0);
+                    // mark its parent node direction
+                    dir_map[xdx][ydy]=(i+dir/2)%dir;
+                }
+                else if(open_nodes_map[xdx][ydy]>m0->getPriority())
+                {
+                    // update the priority info
+                    open_nodes_map[xdx][ydy]=m0->getPriority();
+                    // update the parent direction info
+                    dir_map[xdx][ydy]=(i+dir/2)%dir;
+
+                    // replace the node
+                    // by emptying one pq to the other one
+                    // except the node to be replaced will be ignored
+                    // and the new node will be pushed in instead
+                    while(!(pq[pqi].top().getxPos()==xdx && 
+                           pq[pqi].top().getyPos()==ydy))
+                    {                
+                        pq[1-pqi].push(pq[pqi].top());
+                        pq[pqi].pop();       
+                    }
+                    pq[pqi].pop(); // remove the wanted node
+                    
+                    // empty the larger size pq to the smaller one
+                    if(pq[pqi].size()>pq[1-pqi].size()) pqi=1-pqi;
+                    while(!pq[pqi].empty())
+                    {                
+                        pq[1-pqi].push(pq[pqi].top());
+                        pq[pqi].pop();       
+                    }
+                    pqi=1-pqi;
+                    pq[pqi].push(*m0); // add the better node instead
+                }
+                else delete m0; // garbage collection
+            }
+        }
+        delete n0; // garbage collection
+    }
+    return ""; // no route found
+}
+
+
+#endif
+// ================
+// End A* Algorithm
+// ================ 
+
+
+
 boost::mutex cld_mutex, img_mutex;
 pcl::PointCloud<pcl::PointXYZRGBA>::Ptr new_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>());
 pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr g_cloud;
@@ -104,6 +328,13 @@ bool status_text_set = false;
 float detection_box_x = 0.5f;
 float detection_box_y = 3.0f;
 float detection_box_z = 10.0f;
+
+const int occmap_width(500), occmap_height(500);
+
+int occ_img_data[occmap_width][occmap_height];
+int occ_ground_img_data[occmap_width][occmap_height];
+//int new_occ_map_data[occmap_width][occmap_height];
+unsigned char occ_img_data_view[occmap_width * occmap_height];
 
 void setStatusText(const std::string& text, int viewport = 0) 
 {
@@ -623,22 +854,22 @@ int
 			std::cout << "Object occmap point cloud size: " << object_occmap_cloud->points.size() << std::endl;
 			
 			
-			float min_occmap_x(object_occmap_cloud->points[0].x), max_occmap_x(object_occmap_cloud->points[0].x), min_occmap_z(object_occmap_cloud->points[0].z), max_occmap_z(object_occmap_cloud->points[0].z);
+			float min_occmap_x(ground_occmap_cloud->points[0].x), max_occmap_x(ground_occmap_cloud->points[0].x), min_occmap_z(ground_occmap_cloud->points[0].z), max_occmap_z(ground_occmap_cloud->points[0].z);
 
-			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
+			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
 				// fill in our occupancy matrix here
 				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " y: " << object_occmap_cloud->points[point_index].y << " z: " << std::endl;
-				if(object_occmap_cloud->points[point_index].x < min_occmap_x)
-					min_occmap_x = object_occmap_cloud->points[point_index].x;
+				if(ground_occmap_cloud->points[point_index].x < min_occmap_x)
+					min_occmap_x = ground_occmap_cloud->points[point_index].x;
 
-				if(object_occmap_cloud->points[point_index].x > max_occmap_x)
-					max_occmap_x = object_occmap_cloud->points[point_index].x;
+				if(ground_occmap_cloud->points[point_index].x > max_occmap_x)
+					max_occmap_x = ground_occmap_cloud->points[point_index].x;
 
-				if(object_occmap_cloud->points[point_index].z < min_occmap_z)
-					min_occmap_z = object_occmap_cloud->points[point_index].z;
+				if(ground_occmap_cloud->points[point_index].z < min_occmap_z)
+					min_occmap_z = ground_occmap_cloud->points[point_index].z;
 
-				if(object_occmap_cloud->points[point_index].z > max_occmap_z)
-					max_occmap_z = object_occmap_cloud->points[point_index].z;
+				if(ground_occmap_cloud->points[point_index].z > max_occmap_z)
+					max_occmap_z = ground_occmap_cloud->points[point_index].z;
 
 				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " z: " << object_occmap_cloud->points[point_index].z << std::endl;
 			}
@@ -646,9 +877,7 @@ int
 
 			std::cout << "Occmap min x: " << min_occmap_x << " z: " << min_occmap_z << " max x: " << max_occmap_x << " z: " << max_occmap_z << std::endl;
 
-			const int occmap_width(500), occmap_height(500);
 
-			unsigned char occ_img_data[occmap_width * occmap_height];
 						/*for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_y = 0; occ_img_y < occmap_height; occ_img_y++) {
 					int occ_img_i = (occ_img_x * occmap_width) + occ_img_y;
@@ -658,38 +887,68 @@ int
 
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
-					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
-					occ_img_data[occ_img_i] = 0; // initiaize the array to zero (not automatically done when we make an array)
+					//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					occ_img_data[occ_img_x][occ_img_z] = 0; // initiaize the array to zero (not automatically done when we make an array)
+					occ_ground_img_data[occ_img_x][occ_img_z] = 0;
+				}
+			}
+
+			const int dilation = 20;
+
+			float x_bin_width((max_occmap_x - min_occmap_x) / (occmap_width - 1)), z_bin_width((max_occmap_z - min_occmap_z) / (occmap_height - 1));
+			
+
+			// fill in the ground occupancy matrix
+			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
+				// fill in our occupancy matrix here
+				int occ_img_x((ground_occmap_cloud->points[point_index].x - min_occmap_x) / x_bin_width), occ_img_z((ground_occmap_cloud->points[point_index].z - min_occmap_z) / z_bin_width);
+				if(occ_img_x >= 0 && occ_img_x < occmap_width && occ_img_z >= 0 && occ_img_z < occmap_height) {
+					//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					//std::cout << "cloud x: " << object_occmap_cloud->points[point_index].x << " cloud y: " << object_occmap_cloud->points[point_index].z << " occ_img_x: " << occ_img_x << " occ_img_y: " << occ_img_z << std::endl;
+					occ_ground_img_data[occ_img_x][occ_img_z] = 1;
 				}
 			}
 
 
-			float x_bin_width((max_occmap_x - min_occmap_x) / (occmap_width - 1)), z_bin_width((max_occmap_z - min_occmap_z) / (occmap_height - 1));
+
+			
+			// fill in the object occupancy matrix
 			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
 				// fill in our occupancy matrix here
 				int occ_img_x((object_occmap_cloud->points[point_index].x - min_occmap_x) / x_bin_width), occ_img_z((object_occmap_cloud->points[point_index].z - min_occmap_z) / z_bin_width);
-				//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
-				//std::cout << "cloud x: " << object_occmap_cloud->points[point_index].x << " cloud y: " << object_occmap_cloud->points[point_index].z << " occ_img_x: " << occ_img_x << " occ_img_y: " << occ_img_z << std::endl;
-				for(int x2 = occ_img_x; x2 < occ_img_x + ; x2++) {
-					for(int z2 = occ_img_z; z2 < occmap_height; z2++) {
-						int i2 = (x2 * occmap_width) + z2;
-						occ_img_data[i2] = 255;
+				if(occ_img_x < occmap_width && occ_img_z < occmap_height) {
+					//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					//std::cout << "cloud x: " << object_occmap_cloud->points[point_index].x << " cloud y: " << object_occmap_cloud->points[point_index].z << " occ_img_x: " << occ_img_x << " occ_img_y: " << occ_img_z << std::endl;
+					//occ_img_data[occ_img_x][occ_img_z] = 255;
+
+					for(int p = 0;p<((dilation * 2) + 1);p++){
+						for(int q = 0;q<((dilation * 2) + 1);q++){
+							int point_x((occ_img_x-dilation) + p), point_z((occ_img_z-dilation) + q);
+							if(point_x >= 0 && point_x < occmap_width && point_z >= 0 && point_z < occmap_height) {
+								occ_img_data[point_x][point_z] = 1;
+							}
+						}
 					}
 				}
-				//occ_img_data[occ_img_i] = 255;
 			}
 
+
+			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
+				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
+					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
+					//occ_img_data_view[occ_img_i] = (occ_ground_img_data[occ_img_x][occ_img_z] * 255); // 1's get transformed to 255's
+				}
+			}
+
+
+			occ_img->showMonoImage(occ_img_data_view, occmap_width, occmap_height);
 			
 
-
-
-			occ_img->showMonoImage(occ_img_data, occmap_width, occmap_height);
-			
-
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (object_occmap_cloud);
-			if (!cld->updatePointCloud (object_occmap_cloud, handler, "OpenNICloud"))
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
+			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
 			{
-				cld->addPointCloud (object_occmap_cloud, handler, "OpenNICloud");
+				cld->addPointCloud (new_cloud, handler, "OpenNICloud");
 				cld->resetCameraViewpoint ("OpenNICloud");
 			}
 			cld_mutex.unlock ();
@@ -715,10 +974,6 @@ int
 			img_mutex.unlock ();
 		}
 #endif
-
-		
-
-
 
 		boost::this_thread::sleep (boost::posix_time::microseconds (100));
 	}
