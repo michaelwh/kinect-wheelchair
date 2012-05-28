@@ -267,7 +267,7 @@ int main()
 */
 
     // dilate the map (circle dilation)
-    int dilation = 2; // radius of dilation
+    int dilation = 6; // radius of dilation
     for(int y=dilation;y<(m-dilation);y++){
         for(int x=dilation;x<(n-dilation);x++) {
             if(map[x][y] == 1){
@@ -289,6 +289,7 @@ int main()
         }
     }
     
+/*
     // randomly select start and finish locations
     int xA, yA, xB, yB;
     switch(rand()%8)
@@ -302,52 +303,58 @@ int main()
         case 6: xA=0;yA=m/2-1;xB=n-1;yB=m/2+1; break;
         case 7: xA=n-1;yA=m/2+1;xB=0;yB=m/2-1; break;
     }
-
-    cout<<"Map Size (X,Y): "<<n<<","<<m<<endl;
-    cout<<"Start: "<<xA<<","<<yA<<endl;
-    cout<<"Finish: "<<xB<<","<<yB<<endl;
-    // get the route
-    clock_t start = clock();
-    string route=pathFind(xA, yA, xB, yB);
-    if(route=="") cout<<"An empty route generated!"<<endl;
-    clock_t end = clock();
-    double time_elapsed = double(end - start);
-    cout<<"Time to calculate the route (ms): "<<time_elapsed<<endl;
-    cout<<"Route:"<<endl;
-    cout<<route<<endl<<endl;
-
-    // follow the route on the map and display it 
-    if(route.length()>0)
-    {
-        int j; char c;
-        int x=xA;
-        int y=yA;
-        map[x][y]=2;
-        for(int i=0;i<route.length();i++)
-        {
-            c =route.at(i);
-            j=atoi(&c); 
-            x=x+dx[j];
-            y=y+dy[j];
-            map[x][y]=3;
-        }
-        map[x][y]=4;
+*/
     
-        // display the map with the route
-        for(int y=0;y<m;y++)
+    int xA, yA, xB, yB;
+    xA = n/2-1; yA = m; xB = 0; yB = 0;
+    
+    for(xB = 0; xB < n; xB += 5){
+        cout<<"Map Size (X,Y): "<<n<<","<<m<<endl;
+        cout<<"Start: "<<xA<<","<<yA<<endl;
+        cout<<"Finish: "<<xB<<","<<yB<<endl;
+        // get the route
+        clock_t start = clock();
+        string route=pathFind(xA, yA, xB, yB);
+        if(route=="") cout<<"An empty route generated!"<<endl; // test for empty route
+        clock_t end = clock();
+        double time_elapsed = double(end - start);
+        cout<<"Time to calculate the route (ms): "<<time_elapsed<<endl;
+        cout<<"Route:"<<endl;
+        cout<<route<<endl<<endl;
+
+        // follow the route on the map and display it 
+        if(route.length()>0)
         {
-            for(int x=0;x<n;x++)
-                if(map[x][y]==0)
-                    cout<<".";
-                else if(map[x][y]==1)
-                    cout<<"O"; //obstacle
-                else if(map[x][y]==2)
-                    cout<<"S"; //start
-                else if(map[x][y]==3)
-                    cout<<"R"; //route
-                else if(map[x][y]==4)
-                    cout<<"F"; //finish
-            cout<<endl;
+            int j; char c;
+            int x=xA;
+            int y=yA;
+            map[x][y]=2;
+            for(int i=0;i<route.length();i++)
+            {
+                c =route.at(i);
+                j=atoi(&c); 
+                x=x+dx[j];
+                y=y+dy[j];
+                map[x][y]=3;
+            }
+            map[x][y]=4;
+        
+            // display the map with the route
+            for(int y=0;y<m;y++)
+            {
+                for(int x=0;x<n;x++)
+                    if(map[x][y]==0)
+                        cout<<".";
+                    else if(map[x][y]==1)
+                        cout<<"O"; //obstacle
+                    else if(map[x][y]==2)
+                        cout<<"S"; //start
+                    else if(map[x][y]==3)
+                        cout<<"R"; //route
+                    else if(map[x][y]==4)
+                        cout<<"F"; //finish
+                cout<<endl;
+            }
         }
     }
     getchar(); // wait for a (Enter) keypress  
