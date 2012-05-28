@@ -249,7 +249,9 @@ int main()
         } 
     }
 */
-    // dilate the map
+
+/*
+    // dilate the map (square dilation)
     int dilation = 2; // radius of dilation
     for(int y=dilation;y<(m-dilation);y++){
         for(int x=dilation;x<(n-dilation);x++) {
@@ -257,6 +259,23 @@ int main()
                 for(int p = 0;p<(dilation*2 +1);p++){
                     for(int q = 0;q<(dilation*2 +1);q++){
                         new_map[(x-dilation) + p][(y-dilation) + q] = 1;
+                    }
+                }
+            }
+        } 
+    }
+*/
+
+    // dilate the map (circle dilation)
+    int dilation = 2; // radius of dilation
+    for(int y=dilation;y<(m-dilation);y++){
+        for(int x=dilation;x<(n-dilation);x++) {
+            if(map[x][y] == 1){
+                for(int p = 0;p<(dilation*2 +1);p++){
+                    for(int q = 0;q<(dilation*2 +1);q++){
+                        if(sqrt((x - ((x-dilation) + p))*(x - ((x-dilation) + p)) + (y - ((y-dilation) + q))*(y - ((y-dilation) + q)) <= (dilation + 0.5)) {
+                            new_map[(x-dilation) + p][(y-dilation) + q] = 1;
+                        }
                     }
                 }
             }
