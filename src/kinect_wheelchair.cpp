@@ -58,6 +58,9 @@
 #include <pcl/filters/crop_box.h>
 #include <pcl/filters/project_inliers.h>
 
+
+//#include <pcl/io/pcd_io.h>
+
 #include <string>
 
 
@@ -94,6 +97,7 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> cld;
 #if !((VTK_MAJOR_VERSION == 5)&&(VTK_MINOR_VERSION <= 4))
 boost::shared_ptr<pcl::visualization::ImageViewer> img;
 #endif
+boost::shared_ptr<pcl::visualization::ImageViewer> occ_img;
 
 bool status_text_set = false;
 
@@ -147,6 +151,7 @@ struct EventHelper
 		g_image = image;
 		img_mutex.unlock ();
 	}
+
 #endif  
 };
 // Simple callbacks.
@@ -297,6 +302,8 @@ int
 	unsigned rgb_data_size = 0;
 #endif 
 
+	occ_img.reset(new pcl::visualization::ImageViewer("Occupancy map viewer"));
+
 	viewer->start();
 
 	Eigen::VectorXf ground_plane_model_coeffs(4);
@@ -336,6 +343,8 @@ int
 				//}
 
 				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(90.0), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, "best_cube");
+
+				//pcl::io::savePCDFileASCII("test_kinect_pcd.pcd", *g_cloud);
 
 				cld_init = !cld_init;
 			}
@@ -613,10 +622,68 @@ int
 			// WANT IT TO BE THE SAME BETWEEN ITERATIONS AND NOT DEPEND ON DATA (AT LEAST FOR NOW)
 			std::cout << "Object occmap point cloud size: " << object_occmap_cloud->points.size() << std::endl;
 			
+			
+			float min_occmap_x(object_occmap_cloud->points[0].x), max_occmap_x(object_occmap_cloud->points[0].x), min_occmap_z(object_occmap_cloud->points[0].z), max_occmap_z(object_occmap_cloud->points[0].z);
+
 			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
 				// fill in our occupancy matrix here
 				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " y: " << object_occmap_cloud->points[point_index].y << " z: " << std::endl;
+				if(object_occmap_cloud->points[point_index].x < min_occmap_x)
+					min_occmap_x = object_occmap_cloud->points[point_index].x;
+
+				if(object_occmap_cloud->points[point_index].x > max_occmap_x)
+					max_occmap_x = object_occmap_cloud->points[point_index].x;
+
+				if(object_occmap_cloud->points[point_index].z < min_occmap_z)
+					min_occmap_z = object_occmap_cloud->points[point_index].z;
+
+				if(object_occmap_cloud->points[point_index].z > max_occmap_z)
+					max_occmap_z = object_occmap_cloud->points[point_index].z;
+
+				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " z: " << object_occmap_cloud->points[point_index].z << std::endl;
 			}
+			
+
+			std::cout << "Occmap min x: " << min_occmap_x << " z: " << min_occmap_z << " max x: " << max_occmap_x << " z: " << max_occmap_z << std::endl;
+
+			const int occmap_width(500), occmap_height(500);
+
+			unsigned char occ_img_data[occmap_width * occmap_height];
+						/*for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
+				for(int occ_img_y = 0; occ_img_y < occmap_height; occ_img_y++) {
+					int occ_img_i = (occ_img_x * occmap_width) + occ_img_y;
+					occ_img_data[occ_img_i] = (unsigned char)occ_img_x;
+				}
+			}*/
+
+			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
+				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
+					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					occ_img_data[occ_img_i] = 0; // initiaize the array to zero (not automatically done when we make an array)
+				}
+			}
+
+
+			float x_bin_width((max_occmap_x - min_occmap_x) / (occmap_width - 1)), z_bin_width((max_occmap_z - min_occmap_z) / (occmap_height - 1));
+			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
+				// fill in our occupancy matrix here
+				int occ_img_x((object_occmap_cloud->points[point_index].x - min_occmap_x) / x_bin_width), occ_img_z((object_occmap_cloud->points[point_index].z - min_occmap_z) / z_bin_width);
+				//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+				//std::cout << "cloud x: " << object_occmap_cloud->points[point_index].x << " cloud y: " << object_occmap_cloud->points[point_index].z << " occ_img_x: " << occ_img_x << " occ_img_y: " << occ_img_z << std::endl;
+				for(int x2 = occ_img_x; x2 < occ_img_x + ; x2++) {
+					for(int z2 = occ_img_z; z2 < occmap_height; z2++) {
+						int i2 = (x2 * occmap_width) + z2;
+						occ_img_data[i2] = 255;
+					}
+				}
+				//occ_img_data[occ_img_i] = 255;
+			}
+
+			
+
+
+
+			occ_img->showMonoImage(occ_img_data, occmap_width, occmap_height);
 			
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (object_occmap_cloud);
@@ -648,6 +715,11 @@ int
 			img_mutex.unlock ();
 		}
 #endif
+
+		
+
+
+
 		boost::this_thread::sleep (boost::posix_time::microseconds (100));
 	}
 
