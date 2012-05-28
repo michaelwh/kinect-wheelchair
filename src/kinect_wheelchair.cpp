@@ -328,7 +328,7 @@ float detection_box_x = 0.5f;
 float detection_box_y = 3.0f;
 float detection_box_z = 10.0f;
 
-const int occmap_width(500), occmap_height(500);
+const int occmap_width(250), occmap_height(250);
 
 int occ_img_data[occmap_width][occmap_height];
 int occ_ground_img_data[occmap_width][occmap_height];
@@ -854,7 +854,8 @@ int
 			std::cout << "Object occmap point cloud size: " << object_occmap_cloud->points.size() << std::endl;
 			
 			
-			float min_occmap_x(ground_occmap_cloud->points[0].x), max_occmap_x(ground_occmap_cloud->points[0].x), min_occmap_z(ground_occmap_cloud->points[0].z), max_occmap_z(ground_occmap_cloud->points[0].z);
+			//float min_occmap_x(ground_occmap_cloud->points[0].x), max_occmap_x(ground_occmap_cloud->points[0].x), min_occmap_z(ground_occmap_cloud->points[0].z), max_occmap_z(ground_occmap_cloud->points[0].z);
+			float min_occmap_x(-2.36629), max_occmap_x(2.01318), min_occmap_z(0.9958), max_occmap_z(6.018);
 
 			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
 				// fill in our occupancy matrix here
@@ -898,7 +899,7 @@ int
 			float x_bin_width((max_occmap_x - min_occmap_x) / (occmap_width - 1)), z_bin_width((max_occmap_z - min_occmap_z) / (occmap_height - 1));
 			
 
-			const int ground_first_pass_dilation = 10;
+			const int ground_first_pass_dilation = 5;
 
 			// fill in the ground occupancy matrix
 			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
@@ -941,7 +942,9 @@ int
 							}
 						}
 					} else {
-						occ_ground_img_data_new[occ_img_x][occ_img_z] = 1;
+						if(occ_img_x >= 0 && occ_img_x < occmap_width && occ_img_z >= 0 && occ_img_z < occmap_height) {
+							occ_ground_img_data_new[occ_img_x][occ_img_z] = 1;
+						}
 					}
 
 				}
@@ -1000,8 +1003,6 @@ int
 					  default:
 						 break;
 					}
-
-					
 
 					//}
 
