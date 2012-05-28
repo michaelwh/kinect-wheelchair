@@ -102,13 +102,13 @@
 // http://code.activestate.com/recipes/577457-a-star-shortest-path-algorithm/
 // It is NOT our code
 // ================================================================================
-#if 0
+
 
 using namespace std;
 
 const int n=60; // horizontal size of the map
 const int m=60; // vertical size size of the map
-static int map[n][m];
+static int astar_map[n][m];
 static int new_map[n][m];
 static int closed_nodes_map[n][m]; // map of closed (tried-out) nodes
 static int open_nodes_map[n][m]; // map of open (not-yet-tried) nodes
@@ -159,7 +159,8 @@ class node
             yd=yDest-yPos;         
 
             // Euclidian Distance
-            d=static_cast<int>(sqrt(xd*xd+yd*yd));
+            d=static_cast<int>(std::sqrt((float)(xd*xd+yd*yd)));
+
 
             // Manhattan distance
             //d=abs(xd)+abs(yd);
@@ -249,7 +250,7 @@ string pathFind( const int & xStart, const int & yStart,
         {
             xdx=x+dx[i]; ydy=y+dy[i];
 
-            if(!(xdx<0 || xdx>n-1 || ydy<0 || ydy>m-1 || map[xdx][ydy]==1 
+			if(!(xdx<0 || xdx>n-1 || ydy<0 || ydy>m-1 || astar_map[xdx][ydy]==1 
                 || closed_nodes_map[xdx][ydy]==1))
             {
                 // generate a child node
@@ -303,8 +304,6 @@ string pathFind( const int & xStart, const int & yStart,
     return ""; // no route found
 }
 
-
-#endif
 // ================
 // End A* Algorithm
 // ================ 
@@ -333,7 +332,8 @@ const int occmap_width(500), occmap_height(500);
 
 int occ_img_data[occmap_width][occmap_height];
 int occ_ground_img_data[occmap_width][occmap_height];
-//int new_occ_map_data[occmap_width][occmap_height];
+int occ_ground_img_data_new[occmap_width][occmap_height];
+int occ_map_final[occmap_width][occmap_height];
 unsigned char occ_img_data_view[occmap_width * occmap_height];
 
 void setStatusText(const std::string& text, int viewport = 0) 
@@ -893,10 +893,12 @@ int
 				}
 			}
 
-			const int dilation = 20;
+
 
 			float x_bin_width((max_occmap_x - min_occmap_x) / (occmap_width - 1)), z_bin_width((max_occmap_z - min_occmap_z) / (occmap_height - 1));
 			
+
+			const int ground_first_pass_dilation = 10;
 
 			// fill in the ground occupancy matrix
 			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
@@ -905,12 +907,48 @@ int
 				if(occ_img_x >= 0 && occ_img_x < occmap_width && occ_img_z >= 0 && occ_img_z < occmap_height) {
 					//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
 					//std::cout << "cloud x: " << object_occmap_cloud->points[point_index].x << " cloud y: " << object_occmap_cloud->points[point_index].z << " occ_img_x: " << occ_img_x << " occ_img_y: " << occ_img_z << std::endl;
-					occ_ground_img_data[occ_img_x][occ_img_z] = 1;
+					
+					for(int p = 0;p<((ground_first_pass_dilation * 2) + 1);p++){
+						for(int q = 0;q<((ground_first_pass_dilation * 2) + 1);q++){
+							int point_x((occ_img_x-ground_first_pass_dilation) + p), point_z((occ_img_z-ground_first_pass_dilation) + q);
+							if(point_x >= 0 && point_x < occmap_width && point_z >= 0 && point_z < occmap_height) {
+								occ_ground_img_data[point_x][point_z] = 1;
+							}
+						}
+					}
+					//occ_ground_img_data[occ_img_x][occ_img_z] = 1;
 				}
 			}
 
 
+			const int ground_shrink_dilation = 20;
 
+			// shrink ground by growing non ground
+			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
+				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
+					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
+					//occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
+					if(occ_ground_img_data[occ_img_x][occ_img_z] == 0) {
+						for(int p = 0;p<((ground_shrink_dilation * 2) + 1);p++){
+							for(int q = 0;q<((ground_shrink_dilation * 2) + 1);q++){
+								int point_x((occ_img_x-ground_shrink_dilation) + p), point_z((occ_img_z-ground_shrink_dilation) + q);
+								if(point_x >= 0 && point_x < occmap_width && point_z >= 0 && point_z < occmap_height) {
+									if(occ_ground_img_data[point_x][point_z] == 1)
+										occ_ground_img_data_new[point_x][point_z] = 2;
+									else
+										occ_ground_img_data_new[point_x][point_z] = 0;
+								}
+							}
+						}
+					} else {
+						occ_ground_img_data_new[occ_img_x][occ_img_z] = 1;
+					}
+
+				}
+			}
+
+
+			const int dilation = 20;
 			
 			// fill in the object occupancy matrix
 			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
@@ -936,8 +974,37 @@ int
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
 					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
-					occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
-					//occ_img_data_view[occ_img_i] = (occ_ground_img_data[occ_img_x][occ_img_z] * 255); // 1's get transformed to 255's
+					//occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
+					//if(occ_img_data[occ_img_x][occ_img_z] == 1) 
+					//{
+					//	occ_img_data_view[occ_img_i] = (occ_ground_img_data_new[occ_img_x][occ_img_z] * (255 / 2));
+					//}
+					//else 
+					//{ 
+
+					switch (occ_ground_img_data_new[occ_img_x][occ_img_z])
+					{
+					  case 0:
+						occ_img_data_view[occ_img_i] = 0;
+						break;
+					  case 1:
+						  if(occ_img_data[occ_img_x][occ_img_z] == 0) {
+							occ_img_data_view[occ_img_i] = 255;
+						  } else {
+							occ_img_data_view[occ_img_i] = 255 * 0.75;
+						  }
+						break;
+					  case 2:
+						occ_img_data_view[occ_img_i] = 255 / 2;
+						break;
+					  default:
+						 break;
+					}
+
+					
+
+					//}
+
 				}
 			}
 
