@@ -273,7 +273,7 @@ int main()
             if(map[x][y] == 1){
                 for(int p = 0;p<(dilation*2 +1);p++){
                     for(int q = 0;q<(dilation*2 +1);q++){
-                        if(sqrt((x - ((x-dilation) + p))*(x - ((x-dilation) + p)) + (y - ((y-dilation) + q))*(y - ((y-dilation) + q)) <= (dilation + 0.5)) {
+                        if(sqrt((x - ((x-dilation) + p))*(x - ((x-dilation) + p)) + (y - ((y-dilation) + q))*(y - ((y-dilation) + q))) <= (dilation + 0.5)) {
                             new_map[(x-dilation) + p][(y-dilation) + q] = 1;
                         }
                     }
