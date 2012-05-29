@@ -98,6 +98,8 @@
 
 
 const int occmap_width(125), occmap_height(125);
+
+
  
 // ================================================================================
 // Begin A* Algorithm. The code for this A* algorithm has been taken verbatim from:
@@ -326,6 +328,8 @@ boost::shared_ptr<pcl::visualization::ImageViewer> occ_img;
 
 bool status_text_set = false;
 
+volatile float detection_box_length_scale = 0.5f;
+
 float detection_box_x = 0.5f;
 float detection_box_y = 3.0f;
 float detection_box_z = 10.0f;
@@ -394,12 +398,21 @@ void
 	cout << (*message) << " :: ";
 	if (event.getKeyCode())
 		cout << "the key \'" << event.getKeyCode() << "\' (" << (int)event.getKeyCode() << ") was";
-	else
+	else {
 		cout << "the special key \'" << event.getKeySym() << "\' was";
+		if(!event.keyDown()) {
+			if (event.getKeySym() == "Up") 
+				detection_box_length_scale += 0.1f;
+			else if(event.getKeySym() == "Down" && detection_box_length_scale > 0.42f)
+				detection_box_length_scale -= 0.1f;
+		}
+	}
+
 	if (event.keyDown())
 		cout << " pressed" << endl;
 	else
 		cout << " released" << endl;
+
 }
 
 void 
@@ -732,7 +745,7 @@ int
 	
 			//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
 		
-			
+			cout << "Detection box scale: " << detection_box_length_scale << endl;
 			{
 				
 				int most_indicies = 0;
@@ -740,20 +753,17 @@ int
 				
 				int name_i = 0;
 				for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
-					char name[50];
-					//sprintf(name, "decimation_cube_test_%d", name_i);
-					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, 1.0, 0.0), 0.5, 3.0, 10.0, name);
-
+					
 					Eigen::Vector4f boxmin;//(-0.25, -(3.0/2.0), -5.0);
 					boxmin.resize(3);
 					boxmin[0] = -(detection_box_x / 2.0f);
 					boxmin[1] = -(detection_box_y / 2.0f);
-					boxmin[2] = -(detection_box_z / 2.0f);
+					boxmin[2] = -((detection_box_length_scale * detection_box_z) / 2.0f);
 					Eigen::Vector4f boxmax;
 					boxmax.resize(3);
 					boxmax[0] = detection_box_x / 2.0f;
 					boxmax[1] = detection_box_y / 2.0f;
-					boxmax[2] = detection_box_z / 2.0f;
+					boxmax[2] = (detection_box_length_scale * detection_box_z) / 2.0f;
 
 					Eigen::Vector3f boxrotate;
 					boxrotate.resize(3);
@@ -769,6 +779,9 @@ int
 					chair_crop_box.setMax(boxmax);
 					chair_crop_box.setRotation(boxrotate);
 					chair_crop_box.filter(cropped_indicies);
+					std::vector<int> cropped_object_indicies;
+					chair_crop_box.setInputCloud(object_detection_cloud);
+					chair_crop_box.filter(cropped_object_indicies);
 			
 					//if(name_i == 2) {
 					//	for(int i = 0; i < cropped_indicies.size(); i++) {
@@ -784,7 +797,16 @@ int
 					//	cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, name);
 					//}
 
-					//printf("%d indicies at %f degrees\n", cropped_indicies.size(), angle);
+					
+					
+					printf("%d indicies at %f degrees\n", cropped_indicies.size(), angle);
+
+
+					if(cropped_indicies.size() > (int)(detection_box_length_scale * 700.0f) - 30 && cropped_object_indicies.size() < 10) {
+						char name[50];
+						sprintf(name, "decimation_cube_test_%d", name_i);
+						cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_length_scale * detection_box_z, name);
+					}
 
 					if(cropped_indicies.size() > most_indicies) {
 						most_indicies = cropped_indicies.size();
@@ -800,8 +822,8 @@ int
 
 				//cld->removeShape("best_cube"); // we should have already added one right at the beginning so it should be ok to remove it here
 
-				// for some reason the the Quaterion must be -1 in the x axis for the same angle to rotate the same way as the cld->addCube(...) cubes...
-				cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
+				// for some reason the the Quaterion must be -1 in the y axis for the same angle to rotate the same way as the cld->addCube(...) cubes...
+				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
 				
 			}
 
