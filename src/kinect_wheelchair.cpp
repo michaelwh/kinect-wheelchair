@@ -302,6 +302,7 @@ string pathFind( const int & xStart, const int & yStart,
                 }
                 else delete m0; // garbage collection
             }
+			//delete m0; // garbage collection
         }
         delete n0; // garbage collection
     }
@@ -330,6 +331,8 @@ bool status_text_set = false;
 
 volatile float detection_box_length_scale = 0.5f;
 
+const int occmap_display_scale = 4;
+
 float detection_box_x = 0.5f;
 float detection_box_y = 3.0f;
 float detection_box_z = 10.0f;
@@ -338,7 +341,7 @@ int occ_img_data[occmap_width][occmap_height];
 int occ_ground_img_data[occmap_width][occmap_height];
 int occ_ground_img_data_new[occmap_width][occmap_height];
 int occ_map_final[occmap_width][occmap_height];
-unsigned char occ_img_data_view[occmap_width * occmap_height];
+unsigned char occ_img_data_view[(occmap_width * occmap_display_scale) * (occmap_height * occmap_display_scale)];
 
 void setStatusText(const std::string& text, int viewport = 0) 
 {
@@ -890,7 +893,7 @@ int
 			//float min_occmap_x(ground_occmap_cloud->points[0].x), max_occmap_x(ground_occmap_cloud->points[0].x), min_occmap_z(ground_occmap_cloud->points[0].z), max_occmap_z(ground_occmap_cloud->points[0].z);
 			float min_occmap_x(-2.36629), max_occmap_x(2.01318), min_occmap_z(0.9958), max_occmap_z(6.018);
 
-			for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
+			/*for (int point_index = 0; point_index < ground_occmap_cloud->points.size(); point_index++) {
 				// fill in our occupancy matrix here
 				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " y: " << object_occmap_cloud->points[point_index].y << " z: " << std::endl;
 				if(ground_occmap_cloud->points[point_index].x < min_occmap_x)
@@ -906,7 +909,7 @@ int
 					max_occmap_z = ground_occmap_cloud->points[point_index].z;
 
 				//std::cout << "x: " << object_occmap_cloud->points[point_index].x << " z: " << object_occmap_cloud->points[point_index].z << std::endl;
-			}
+			}*/
 			
 
 			//std::cout << "Occmap min x: " << min_occmap_x << " z: " << min_occmap_z << " max x: " << max_occmap_x << " z: " << max_occmap_z << std::endl;
@@ -924,6 +927,7 @@ int
 					//int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
 					occ_img_data[occ_img_x][occ_img_z] = 0; // initiaize the array to zero (not automatically done when we make an array)
 					occ_ground_img_data[occ_img_x][occ_img_z] = 0;
+					astar_map[occ_img_x][occ_img_z] = 0;
 				}
 			}
 
@@ -957,7 +961,7 @@ int
 			}
 
 
-			const int ground_shrink_dilation = 10;
+			const int ground_shrink_dilation = 5;
 
 			// shrink ground by growing non ground
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
@@ -988,7 +992,7 @@ int
 			}
 
 
-			const int dilation = 10;
+			const int dilation = 5;
 			
 			// fill in the object occupancy matrix
 			for (int point_index = 0; point_index < object_occmap_cloud->points.size(); point_index++) {
@@ -1027,9 +1031,10 @@ int
 
 
 
-			int xA(occmap_height / 2), yA(20), xB(occmap_height / 2), yB(occmap_width - 60);
+			int xA(occmap_height / 2), yA(2), xB(occmap_height / 2), yB((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+			
 			string route = pathFind(xA, yA, xB, yB);
-			if(route=="")
+			if(route == "")
 				cout<<"An empty route generated!"<<endl; // test for empty route
 			else
 				cout << "Route generated successfully!" << endl;
@@ -1038,7 +1043,7 @@ int
 			//cout<<route<<endl<<endl;
 
 			// follow the route on the map and display it 
-			/*if(route.length()>0)
+			if(route.length() > 0)
 			{
 				int j; char c;
 				int x=xA;
@@ -1048,14 +1053,17 @@ int
 				{
 					c =route.at(i);
 					j=atoi(&c); 
+					cout << " x before " << x << " y before " << y << endl;
 					x=x+dx[j];
 					y=y+dy[j];
+
+					cout << " x " << x << " y " << y << " c " << c << " j " << j << " dx[j] " << dx[j] << "dy[j] " << dy[j] << endl;
 					astar_map[x][y]=3;
 				}
 				astar_map[x][y]=4;
         
 				// display the map with the route
-				for(int y=0;y<m;y++)
+				/*for(int y=0;y<m;y++)
 				{
 					for(int x=0;x<n;x++)
 						if(astar_map[x][y]==0)
@@ -1069,52 +1077,61 @@ int
 						else if(astar_map[x][y]==4)
 							cout<<"F"; //finish
 					cout<<endl;
-				}
-			}*/
-
+				}*/
+			}
 
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
-					int occ_img_i = (occ_img_x * occmap_width) + occ_img_z;
-					//occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
-					//if(occ_img_data[occ_img_x][occ_img_z] == 1) 
-					//{
-					//	occ_img_data_view[occ_img_i] = (occ_ground_img_data_new[occ_img_x][occ_img_z] * (255 / 2));
-					//}
-					//else 
-					//{ 
+					for(int img_scale_x = occ_img_x * occmap_display_scale; img_scale_x < (occ_img_x * occmap_display_scale) + occmap_display_scale; img_scale_x++) {
+						for(int img_scale_z = occ_img_z * occmap_display_scale; img_scale_z < (occ_img_z * occmap_display_scale) + occmap_display_scale; img_scale_z++) {
+							int occ_img_i = (img_scale_x * (occmap_width * occmap_display_scale)) + img_scale_z;
+							//occ_img_data_view[occ_img_i] = (occ_img_data[occ_img_x][occ_img_z] * 255);
+							//if(occ_img_data[occ_img_x][occ_img_z] == 1) 
+							//{
+							//	occ_img_data_view[occ_img_i] = (occ_ground_img_data_new[occ_img_x][occ_img_z] * (255 / 2));
+							//}
+							//else 
+							//{ 
 
-					switch (occ_ground_img_data_new[occ_img_x][occ_img_z])
-					{
-					  case 0:
-						occ_img_data_view[occ_img_i] = 0;
-						break;
-					  case 1:
-						  if(occ_img_data[occ_img_x][occ_img_z] == 0) {
-							occ_img_data_view[occ_img_i] = 255 * 0.75;
-						  } else {
-							occ_img_data_view[occ_img_i] = 255 * 0.25;
-						  }
-						break;
-					  case 2:
-						occ_img_data_view[occ_img_i] = 255 * 0.15;
-						break;
-					  default:
-						 break;
+							switch (occ_ground_img_data_new[occ_img_x][occ_img_z])
+							{
+							  case 0:
+								occ_img_data_view[occ_img_i] = 0;
+								break;
+							  case 1:
+								  if(occ_img_data[occ_img_x][occ_img_z] == 0) {
+									occ_img_data_view[occ_img_i] = 255 * 0.75;
+								  } else {
+									occ_img_data_view[occ_img_i] = 255 * 0.25;
+								  }
+								break;
+							  case 2:
+								occ_img_data_view[occ_img_i] = 255 * 0.15;
+								break;
+							  default:
+								 break;
+							}
+
+							if(occ_img_x == xA && occ_img_z == yA)
+								occ_img_data_view[occ_img_i] = 255;
+
+							if(occ_img_x == xB && occ_img_z == yB)
+								occ_img_data_view[occ_img_i] = 255;
+
+							//if(astar_map[occ_img_x][occ_img_z] == 2)
+							//	occ_img_data_view[occ_img_i] = 255; //start
+							if(astar_map[occ_img_x][occ_img_z] == 3)
+								occ_img_data_view[occ_img_i] = 255; //route
+							//else if(astar_map[occ_img_x][occ_img_z] == 4)
+							//	occ_img_data_view[occ_img_i] = 255; //finish
+
+							//}
+						}
 					}
-
-					if(occ_img_x == xA && occ_img_z == yA)
-						occ_img_data_view[occ_img_i] = 255;
-
-					if(occ_img_x == xB && occ_img_z == yB)
-						occ_img_data_view[occ_img_i] = 255;
-
-					//}
-
 				}
 			}
 
-			occ_img->showMonoImage(occ_img_data_view, occmap_width, occmap_height);
+			occ_img->showMonoImage(occ_img_data_view, occmap_width * occmap_display_scale, occmap_height * occmap_display_scale);
 			
 
 			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
