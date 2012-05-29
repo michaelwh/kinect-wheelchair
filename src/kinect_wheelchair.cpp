@@ -1016,6 +1016,7 @@ int
 				}
 			}
 
+
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
 					if(occ_ground_img_data_new[occ_img_x][occ_img_z] == 1 && occ_img_data[occ_img_x][occ_img_z] == 0)
@@ -1030,55 +1031,76 @@ int
 			}
 
 
+			for (float angle = -45.0; angle < 45.0; angle += 90.0/10.0) {
+				
 
-			int xA(occmap_height / 2), yA(2), xB(occmap_height / 2), yB((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+				
+				float box_len = ((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+
+				int xA(occmap_height / 2), yA(2);
+				int xB(xA + box_len * sin(pcl::deg2rad(angle))), yB(yA + box_len * cos(pcl::deg2rad(angle)));//xB(occmap_height / 2), yB((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+
+				if(xB >= occmap_height)
+					xB = occmap_height;
+				if(yB >= occmap_width)
+					yB = occmap_width;
 			
-			string route = pathFind(xA, yA, xB, yB);
-			if(route == "")
-				cout<<"An empty route generated!"<<endl; // test for empty route
-			else
-				cout << "Route generated successfully!" << endl;
+				cout<<"Starting route generation!"<<endl; // test for empty route
+				string route = pathFind(xA, yA, xB, yB);
+				//if(route == "")
+				//	cout<<"An empty route generated!"<<endl; // test for empty route
+				//else
+				//	cout << "Route generated successfully!" << endl;// follow the route on the map and display it 
+			
+				astar_map[xA][yA]=2;
+				astar_map[xB][yB]=4;
+			
+				if(route.length() > 0)
+				{
+					int j; char c;
+					int x=xA;
+					int y=yA;
+					//astar_map[x][y]=2;
+					for(int i=0;i<route.length();i++)
+					{
+						c =route.at(i);
+						j=atoi(&c); 
+						if(j >= 8)
+							break;
+						//cout << " x before " << x << " y before " << y << endl;
+						x=x+dx[j];
+						y=y+dy[j];
+						astar_map[x][y]=3;
+						
+						//cout << " x " << x << " y " << y << " c " << c << " j " << j << " dx[j] " << dx[j] << "dy[j] " << dy[j] << endl;
+						
+					}
+					//astar_map[x][y]=4;
+        
+					// display the map with the route
+					/*for(int y=0;y<m;y++)
+					{
+						for(int x=0;x<n;x++)
+							if(astar_map[x][y]==0)
+								cout<<".";
+							else if(astar_map[x][y]==1)
+								cout<<"O"; //obstacle
+							else if(astar_map[x][y]==2)
+								cout<<"S"; //start
+							else if(astar_map[x][y]==3)
+								cout<<"R"; //route
+							else if(astar_map[x][y]==4)
+								cout<<"F"; //finish
+						cout<<endl;
+					}*/
+				}
+
+			}
 			
 			//cout<<"Route:"<<endl;
 			//cout<<route<<endl<<endl;
 
-			// follow the route on the map and display it 
-			if(route.length() > 0)
-			{
-				int j; char c;
-				int x=xA;
-				int y=yA;
-				astar_map[x][y]=2;
-				for(int i=0;i<route.length();i++)
-				{
-					c =route.at(i);
-					j=atoi(&c); 
-					cout << " x before " << x << " y before " << y << endl;
-					x=x+dx[j];
-					y=y+dy[j];
-
-					cout << " x " << x << " y " << y << " c " << c << " j " << j << " dx[j] " << dx[j] << "dy[j] " << dy[j] << endl;
-					astar_map[x][y]=3;
-				}
-				astar_map[x][y]=4;
-        
-				// display the map with the route
-				/*for(int y=0;y<m;y++)
-				{
-					for(int x=0;x<n;x++)
-						if(astar_map[x][y]==0)
-							cout<<".";
-						else if(astar_map[x][y]==1)
-							cout<<"O"; //obstacle
-						else if(astar_map[x][y]==2)
-							cout<<"S"; //start
-						else if(astar_map[x][y]==3)
-							cout<<"R"; //route
-						else if(astar_map[x][y]==4)
-							cout<<"F"; //finish
-					cout<<endl;
-				}*/
-			}
+			
 
 			for(int occ_img_x = 0; occ_img_x < occmap_width; occ_img_x++) {
 				for(int occ_img_z = 0; occ_img_z < occmap_height; occ_img_z++) {
@@ -1112,18 +1134,18 @@ int
 								 break;
 							}
 
-							if(occ_img_x == xA && occ_img_z == yA)
-								occ_img_data_view[occ_img_i] = 255;
+							//if(occ_img_x == xA && occ_img_z == yA)
+							//	occ_img_data_view[occ_img_i] = 255;
 
-							if(occ_img_x == xB && occ_img_z == yB)
-								occ_img_data_view[occ_img_i] = 255;
+							//if(occ_img_x == xB && occ_img_z == yB)
+							//	occ_img_data_view[occ_img_i] = 255;
 
-							//if(astar_map[occ_img_x][occ_img_z] == 2)
-							//	occ_img_data_view[occ_img_i] = 255; //start
+							if(astar_map[occ_img_x][occ_img_z] == 2)
+								occ_img_data_view[occ_img_i] = 255; //start
 							if(astar_map[occ_img_x][occ_img_z] == 3)
 								occ_img_data_view[occ_img_i] = 255; //route
-							//else if(astar_map[occ_img_x][occ_img_z] == 4)
-							//	occ_img_data_view[occ_img_i] = 255; //finish
+							else if(astar_map[occ_img_x][occ_img_z] == 4)
+								occ_img_data_view[occ_img_i] = 255; //finish
 
 							//}
 						}
