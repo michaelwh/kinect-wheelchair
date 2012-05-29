@@ -99,7 +99,7 @@
 
 const int occmap_width(125), occmap_height(125);
 
-
+bool pathfinding_toggle = false;
  
 // ================================================================================
 // Begin A* Algorithm. The code for this A* algorithm has been taken verbatim from:
@@ -408,6 +408,8 @@ void
 				detection_box_length_scale += 0.1f;
 			else if(event.getKeySym() == "Down" && detection_box_length_scale > 0.42f)
 				detection_box_length_scale -= 0.1f;
+			else if(event.getKeySym() == "Control_L")
+				pathfinding_toggle = !pathfinding_toggle;
 		}
 	}
 
@@ -748,7 +750,7 @@ int
 	
 			//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
 		
-			cout << "Detection box scale: " << detection_box_length_scale << endl;
+			//cout << "Detection box scale: " << detection_box_length_scale << endl;
 			{
 				
 				int most_indicies = 0;
@@ -802,7 +804,7 @@ int
 
 					
 					
-					printf("%d indicies at %f degrees\n", cropped_indicies.size(), angle);
+					//printf("%d indicies at %f degrees\n", cropped_indicies.size(), angle);
 
 
 					if(cropped_indicies.size() > (int)(detection_box_length_scale * 700.0f) - 30 && cropped_object_indicies.size() < 10) {
@@ -1030,71 +1032,73 @@ int
 				}
 			}
 
+			if(pathfinding_toggle) {
 
-			for (float angle = -45.0; angle < 45.0; angle += 90.0/10.0) {
+				for (float angle = -45.0; angle < 45.0; angle += 90.0/10.0) {
 				
 
 				
-				float box_len = ((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+					float box_len = ((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
 
-				int xA(occmap_height / 2), yA(2);
-				int xB(xA + box_len * sin(pcl::deg2rad(angle))), yB(yA + box_len * cos(pcl::deg2rad(angle)));//xB(occmap_height / 2), yB((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
+					int xA(occmap_height / 2), yA(2);
+					int xB(xA + box_len * sin(pcl::deg2rad(angle))), yB(yA + box_len * cos(pcl::deg2rad(angle)));//xB(occmap_height / 2), yB((((detection_box_z - 1.0f) * detection_box_length_scale) / 2) / z_bin_width);
 
-				if(xB >= occmap_height)
-					xB = occmap_height;
-				if(yB >= occmap_width)
-					yB = occmap_width;
+					if(xB >= occmap_height)
+						xB = occmap_height;
+					if(yB >= occmap_width)
+						yB = occmap_width;
 			
-				cout<<"Starting route generation!"<<endl; // test for empty route
-				string route = pathFind(xA, yA, xB, yB);
-				//if(route == "")
-				//	cout<<"An empty route generated!"<<endl; // test for empty route
-				//else
-				//	cout << "Route generated successfully!" << endl;// follow the route on the map and display it 
+					//cout<<"Starting route generation!"<<endl; // test for empty route
+					string route = pathFind(xA, yA, xB, yB);
+					//if(route == "")
+					//	cout<<"An empty route generated!"<<endl; // test for empty route
+					//else
+					//	cout << "Route generated successfully!" << endl;// follow the route on the map and display it 
 			
-				astar_map[xA][yA]=2;
-				astar_map[xB][yB]=4;
+					astar_map[xA][yA]=2;
+					astar_map[xB][yB]=4;
 			
-				if(route.length() > 0)
-				{
-					int j; char c;
-					int x=xA;
-					int y=yA;
-					//astar_map[x][y]=2;
-					for(int i=0;i<route.length();i++)
+					if(route.length() > 0)
 					{
-						c =route.at(i);
-						j=atoi(&c); 
-						if(j >= 8)
-							break;
-						//cout << " x before " << x << " y before " << y << endl;
-						x=x+dx[j];
-						y=y+dy[j];
-						astar_map[x][y]=3;
+						int j; char c;
+						int x=xA;
+						int y=yA;
+						//astar_map[x][y]=2;
+						for(int i=0;i<route.length();i++)
+						{
+							c =route.at(i);
+							j=atoi(&c); 
+							if(j >= 8)
+								break;
+							//cout << " x before " << x << " y before " << y << endl;
+							x=x+dx[j];
+							y=y+dy[j];
+							astar_map[x][y]=3;
 						
-						//cout << " x " << x << " y " << y << " c " << c << " j " << j << " dx[j] " << dx[j] << "dy[j] " << dy[j] << endl;
+							//cout << " x " << x << " y " << y << " c " << c << " j " << j << " dx[j] " << dx[j] << "dy[j] " << dy[j] << endl;
 						
-					}
-					//astar_map[x][y]=4;
+						}
+						//astar_map[x][y]=4;
         
-					// display the map with the route
-					/*for(int y=0;y<m;y++)
-					{
-						for(int x=0;x<n;x++)
-							if(astar_map[x][y]==0)
-								cout<<".";
-							else if(astar_map[x][y]==1)
-								cout<<"O"; //obstacle
-							else if(astar_map[x][y]==2)
-								cout<<"S"; //start
-							else if(astar_map[x][y]==3)
-								cout<<"R"; //route
-							else if(astar_map[x][y]==4)
-								cout<<"F"; //finish
-						cout<<endl;
-					}*/
-				}
+						// display the map with the route
+						/*for(int y=0;y<m;y++)
+						{
+							for(int x=0;x<n;x++)
+								if(astar_map[x][y]==0)
+									cout<<".";
+								else if(astar_map[x][y]==1)
+									cout<<"O"; //obstacle
+								else if(astar_map[x][y]==2)
+									cout<<"S"; //start
+								else if(astar_map[x][y]==3)
+									cout<<"R"; //route
+								else if(astar_map[x][y]==4)
+									cout<<"F"; //finish
+							cout<<endl;
+						}*/
+					}
 
+				}
 			}
 			
 			//cout<<"Route:"<<endl;
@@ -1128,7 +1132,8 @@ int
 								  }
 								break;
 							  case 2:
-								occ_img_data_view[occ_img_i] = 255 * 0.15;
+								//occ_img_data_view[occ_img_i] = 255 * 0.15;
+								  occ_img_data_view[occ_img_i] = 0;
 								break;
 							  default:
 								 break;
