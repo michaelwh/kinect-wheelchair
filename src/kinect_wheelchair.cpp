@@ -751,6 +751,7 @@ int
 			//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
 		
 			//cout << "Detection box scale: " << detection_box_length_scale << endl;
+			if(!pathfinding_toggle)
 			{
 				
 				int most_indicies = 0;
