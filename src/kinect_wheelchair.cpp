@@ -681,7 +681,9 @@ int
 			if (ground_cloud_floor_inliers->indices.size () == 0)
 			{
 				PCL_ERROR ("Could not estimate a planar model for the given dataset.");
+				pcl::copyPointCloud(*new_cloud, *ground_cloud);
 				pcl::copyPointCloud(*new_cloud, *object_detection_cloud);
+				//continue;
 			} else {
 				/*pcl::ExtractIndices<pcl::PointXYZRGBA> extract;
 				extract.setInputCloud(ground_detection_cloud);
@@ -732,8 +734,11 @@ int
 		
 			//setStatusText("Setting ground points...");
 
-			
-
+			if(new_cloud->size() <= 0 || ground_cloud->size() <= 0 || object_detection_cloud->size() <= 0) {
+				cld_mutex.unlock();
+				continue;
+				
+			}
 			
 			//std::vector<int> cloud_indicies(new_cloud->size());
 			//for(int i = 0; i < new_cloud->size(); i++)
@@ -751,7 +756,7 @@ int
 			//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tr(new pcl::PointCloud<pcl::PointXYZRGBA>());
 		
 			//cout << "Detection box scale: " << detection_box_length_scale << endl;
-			if(!pathfinding_toggle)
+			if(!pathfinding_toggle && new_cloud->size() > 0 && ground_cloud->size() > 0 && object_detection_cloud->size() > 0)
 			{
 				
 				int most_indicies = 0;
