@@ -1,3 +1,8 @@
+// WE BASED THIS IMPLEMENTATION ON THIS FILE:
+// http://svn.pointclouds.org/pcl/trunk/visualization/tools/openni_viewer.cpp
+// WHICH DISPLAYS A POINT CLOUD AND IMAGE FROM THE RGB KINECT CAMERA
+// WE THEREFORE MUST DISPLAY THE BELOW LICENSE AGREEMENT
+
 /*
 * Software License Agreement (BSD License)
 *
