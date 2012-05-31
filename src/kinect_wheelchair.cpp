@@ -105,6 +105,8 @@
 const int occmap_width(125), occmap_height(125);
 
 bool pathfinding_toggle = false;
+bool manual_toggle = false;
+bool g_cloud_toggle = false;
  
 // ================================================================================
 // Begin A* Algorithm. The code for this A* algorithm has been taken verbatim from:
@@ -413,8 +415,12 @@ void
 				detection_box_length_scale += 0.1f;
 			else if(event.getKeySym() == "Down" && detection_box_length_scale > 0.42f)
 				detection_box_length_scale -= 0.1f;
-			else if(event.getKeySym() == "Control_L")
+			else if(event.getKeySym() == "End")
 				pathfinding_toggle = !pathfinding_toggle;
+			else if(event.getKeySym() == "Shift_L")
+				manual_toggle = !manual_toggle;
+			else if(event.getKeySym() == "Alt_L")
+				g_cloud_toggle = !g_cloud_toggle;
 		}
 	}
 
@@ -763,13 +769,23 @@ int
 			//cout << "Detection box scale: " << detection_box_length_scale << endl;
 			if(!pathfinding_toggle && new_cloud->size() > 0 && ground_cloud->size() > 0 && object_detection_cloud->size() > 0)
 			{
+				float old_scale = detection_box_length_scale;
 				
+				
+
 				int most_indicies = 0;
 				float best_angle = 0;
 				
 				int name_i = 0;
 				for (float angle = -15.0; angle < 15; angle += 30.0/20.0) {
 					
+					 
+					for(float scale = 1.0f; scale > 0.3f; scale -= 0.05f) {
+			
+					if(manual_toggle) {
+						detection_box_length_scale = scale;
+					}
+
 					Eigen::Vector4f boxmin;//(-0.25, -(3.0/2.0), -5.0);
 					boxmin.resize(3);
 					boxmin[0] = -(detection_box_x / 2.0f);
@@ -820,8 +836,9 @@ int
 
 					if(cropped_indicies.size() > (int)(detection_box_length_scale * 700.0f) - 30 && cropped_object_indicies.size() < 10) {
 						char name[50];
-						sprintf(name, "decimation_cube_test_%d", name_i);
+						sprintf(name, "decimation_cube_test_%f_%f", angle, detection_box_length_scale);
 						cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_length_scale * detection_box_z, name);
+						break;
 					}
 
 					if(cropped_indicies.size() > most_indicies) {
@@ -832,6 +849,12 @@ int
 					//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(angle), 0.0, -1.0, 0.0), 0.5, 3.0, 10.0, name);
 
 					name_i++;
+
+					if(!manual_toggle) {
+						break;
+					}
+
+				}
 				}
 
 				//printf("BEST: %d indicies at %f degrees\n", most_indicies, best_angle);
@@ -841,6 +864,8 @@ int
 				// for some reason the the Quaterion must be -1 in the y axis for the same angle to rotate the same way as the cld->addCube(...) cubes...
 				//cld->addCube(Eigen::Vector3f(0.0, 0.0, 0.0), Eigen::Quaternionf(pcl::deg2rad(best_angle), 0.0, -1.0, 0.0), detection_box_x, detection_box_y, detection_box_z, "best_cube");
 				
+				detection_box_length_scale = old_scale;
+
 			}
 
 
@@ -1171,13 +1196,22 @@ int
 
 			occ_img->showMonoImage(occ_img_data_view, occmap_width * occmap_display_scale, occmap_height * occmap_display_scale);
 			
-
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
-			if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
-			{
-				cld->addPointCloud (new_cloud, handler, "OpenNICloud");
-				cld->resetCameraViewpoint ("OpenNICloud");
+			if(!g_cloud_toggle) {
+				pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (new_cloud);
+				if (!cld->updatePointCloud (new_cloud, handler, "OpenNICloud"))
+				{
+					cld->addPointCloud (new_cloud, handler, "OpenNICloud");
+					cld->resetCameraViewpoint ("OpenNICloud");
+				}
+			} else {
+				pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> handler (g_cloud);
+				if (!cld->updatePointCloud (g_cloud, handler, "OpenNICloud"))
+				{
+					cld->addPointCloud (g_cloud, handler, "OpenNICloud");
+					cld->resetCameraViewpoint ("OpenNICloud");
+				}
 			}
+
 			cld_mutex.unlock ();
 		}
 
